@@ -1,0 +1,8 @@
+{
+  "name": "VisionMortis ProtocolOne",
+  "description": "VisionMortis is an AI-assisted multimodal forensic Post-Mortem Interval (PMI) estimation platform from ProtocolOne, combining Algor, Livor, and Rigor mortis, decomposition TBS scoring, entomology ADD/ADH, metabolomics, computer vision, and contradiction detection.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

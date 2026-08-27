@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+/* Universal Scrollbar Elimination: Hide all browser/OS scrollbar tracks across all elements */
+*,
+*::before,
+*::after {
+  -ms-overflow-style: none !important; /* IE and Edge */
+  scrollbar-width: none !important; /* Firefox */
+}
+
+*::-webkit-scrollbar {
+  display: none !important; /* Chrome, Safari, Opera, Edge */
+  width: 0px !important;
+  height: 0px !important;
+  background: transparent !important;
+}
+
+.no-scrollbar,
+.scrollbar-none {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
+  display: none !important;
+  width: 0px !important;
+  height: 0px !important;
+}
+
+/* Ensure mobile layout doesn't horizontally wobble while preserving position: sticky */
+html {
+  overflow-x: clip;
+  max-width: 100vw;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  overflow-x: clip;
+  max-width: 100vw;
+  min-height: 100vh;
+}
+
+/* Precision Print Styles: Ensures clean, ink-friendly light-mode A4 output */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 10mm 12mm 10mm;
+  }
+
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Hide app navigation, preset selector, accordions, sidebars, buttons, and footers */
+  header,
+  footer,
+  nav,
+  aside,
+  #workflow-sidebar,
+  .no-print,
+  button,
+  .print-hidden,
+  #preset-selector-bar,
+  #metadata-card,
+  #vision-card,
+  #algor-card,
+  #livor-card,
+  #rigor-card,
+  #decomposition-card,
+  #entomology-card,
+  #metabolomics-card {
+    display: none !important;
+  }
+
+  body, html, #root, main {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  /* Display the generated report section cleanly in full width */
+  #generated-report-section {
+    display: block !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  #generated-report-section * {
+    color: inherit;
+  }
+
+  .break-inside-avoid {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+
