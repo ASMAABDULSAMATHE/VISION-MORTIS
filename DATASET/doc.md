@@ -1,7 +1,7 @@
 # VisionMortis — Protocol One
 ## Master Multimodal Dataset — Reference Documentation
 
-> Compiled from `VisionMortis_master_multimodal_workbook.xlsx` — Executive Dashboard, Data Dictionary, Data Provenance, and Validation & QC Metrics sheets. Case-level records are provided separately as [`visionmortis_master_multimodal.csv`](../data/raw/visionmortis_master_multimodal.csv).
+> Case-level records are provided separately as [`visionmortis_master_multimodal.csv`](XGBoost_SHAP/visionmortis_master_multimodal.csv).
 
 ---
 
@@ -22,9 +22,58 @@ VisionMortis is a research prototype supporting post-mortem interval (PMI) estim
 | Incomplete Case Cohort | 198 cases (39.6%) — deliberately missing modality data for robustness testing |
 | Forensic Conflict Cohort | 55 cases (11.0%) — deliberately contradictory evidence for discordance testing |
 
-> **Note:** figures above reflect the 500-case dataset as verified directly from the Master Multimodal Data sheet. The workbook's Executive Dashboard / Validation & QC Metrics sheets contain some legacy figures (e.g. a *"Total Cases Generated: 3000"* entry, and modality completeness rates computed against a different case count) inherited from an earlier data-generation run; these have **not** been carried into this document.
 
-## 2. Modality Integration & Statistical Profile
+## 2. Preprocessing
+### 1. Target
+`synthetic_pmi_hours` is the regression target only. Excluded from all predictor matrices in `training_preprocessed.csv`, `validation_preprocessed.csv`, `test_preprocessed.csv` — it appears in those files as a clearly-named target column, not mixed into the feature columns.
+
+### 2. Split
+- Split by `case_id`, 70/15/15 (train=350, val=75, test=75), stratified on PMI quintile bin, `random_state=42`.
+- Verified zero `case_id` overlap between all three partitions.
+- Target distribution by split:
+
+| Split | Median PMI | Mean PMI |
+|---|---|---|
+| Train | 78.5h | 138.4h |
+| Val | 57.4h | 136.5h |
+| Test | 62.2h | 164.4h |
+
+Medians differ somewhat across splits (a consequence of the small n=500 and heavy right-skew, skew=2.08). Stratification by quintile keeps means reasonably aligned; a log-PMI stratification was considered but not applied, since qcut on raw PMI already produced adequately balanced bins for this sample size.
+
+### 3. Leakage decisions
+
+| Excluded from predictors | Reason |
+|---|---|
+| `case_id` | Identifier only |
+| `synthetic_conflict_case`, `conflict_type` | Generation-process metadata describing how evidence was deliberately made to conflict relative to the target; not observable forensic evidence. Retained in output files with `__METADATA_ONLY` suffix for subgroup evaluation. |
+| `data_origin`, `validation_status`, `metabolomics_synthetic_flag` | Constant-value provenance/metadata, zero variance, no predictive content |
+
+
+### 4. Numeric features
+- All numeric predictors: **both raw (original units) and train-fit z-scored** versions are output (`{col}__raw`, `{col}__scaled`), so downstream modeling can choose either representation without needing to re-fit.
+- Scaler mean/std computed **only on the training split**; applied unchanged to validation and test.
+- A `{col}__missing` binary indicator is emitted alongside every numeric feature with any missingness (metabolomics analytes, `body_temperature_C`).
+- No values were clipped, imputed, or removed. Per Data Dictionary guidance, `body_temperature_C` is preserved even where it has plateaued near ambient (not clipped), since the plateau itself is informative to a downstream model about signal saturation.
+
+### 5. Ordinal categoricals
+Encoded to integer order reflecting genuine temporal/severity progression, with "Unobservable"/"Unknown"/"No activity" encoded as **their own explicit level** (lowest, or a dedicated level) rather than collapsed into missing:
+
+- `livor_stage`, `cv_livor_stage`: Unobservable → Not detectable → Early/patchy → Confluent/blanches → Partially fixed → Fully fixed
+- `rigor_stage`: Unobservable → Absent → Beginning → Partial → Complete → Passing off → Resolved
+- `decomposition_stage`, `cv_decomposition_stage`: Fresh → Early decomposition → Bloat → Active decay → Advanced decay → Skeletonization
+- `insect_developmental_stage`, `cv_entomology_stage`: No activity/Unassessed → Eggs → 1st → 2nd → 3rd instar → Wandering larvae → Pupae → Empty puparia → Late succession
+- `body_movement_position_change`, `cv_movement_position_change`: Unknown → Not detected → Possible → Detected
+
+A `{col}__missing` flag is also emitted for true NaNs in the CV-mirrored stage columns (where `cv_available = 0`).
+
+### 6. Nominal categoricals
+One-hot encoded: `clothing`, `deposition_site`, `insect_species`. Category set fixed from the **training split only**; any category appearing only in val/test would map to all-zero indicator columns (none occurred in this run, but the mechanism is in place).
+
+
+### 8. Manual vs. CV provenance
+Every CV-derived field is a **separate column** from its manual-observation counterpart (`livor_stage` vs. `cv_livor_stage`, etc.) — never merged. `cv_available` is preserved as its own availability gate; **`cv_available = 0` is never treated as evidence of absence for the corresponding phenomenon** — it produces `NaN`/missing in the CV columns, not a negative value.
+
+## 3. Modality Integration & Statistical Profile
 
 | Modality | Key Variables | Completeness | Forensic Foundation | Status |
 |---|---|---|---|---|
@@ -40,7 +89,7 @@ VisionMortis is a research prototype supporting post-mortem interval (PMI) estim
 
 > Completeness rates above are recomputed directly from the 500-case Master Multimodal Data sheet (percentage of cases with a non-zero observation confidence, or the relevant availability flag set to 1).
 
-## 3. Validation & QC Metrics
+## 4. Validation & QC Metrics
 
 | Metric Description | Validation Value / Status |
 |---|---|
@@ -61,7 +110,7 @@ VisionMortis is a research prototype supporting post-mortem interval (PMI) estim
 | Metabolomics Fully Available Percentage (%) | 88.20% |
 | Computer Vision Observations Available (%) | 90.40% |
 
-## 4. Data Dictionary
+## 5. Data Dictionary
 
 Full variable-level reference for the 72-column Master Multimodal Data table. All variables are synthetic (literature/data-informed); none constitute validated forensic ground truth.
 
@@ -97,7 +146,7 @@ Full variable-level reference for the 72-column Master Multimodal Data table. Al
 | `data_origin` | Provenance flag for dataset generation source | string | N/A | literature/data-informed synthetic | VISIONMORTIS project governance | Metadata / Provenance | Fixed provenance string |
 | `validation_status` | Regulatory and forensic validation disclaimer | string | N/A | Prototype dataset; not validated forensic ground truth | Ethical and scientific disclosure requirement | Metadata / Governance | Not ground truth |
 
-## 5. Data Provenance
+## 6. Data Provenance
 
 Scientific literature underpinning each modality's synthetic modeling approach. All modalities are explicitly marked as not validated against real forensic ground truth.
 
@@ -112,7 +161,7 @@ Scientific literature underpinning each modality's synthetic modeling approach. 
 | Body Movement & Context | Forensic pathology context modeling | Spitz and Fisher's Medicolegal Investigation of Death (5th Edition). | Categorical contextual evidence generation uncoupled from direct clock formulas | **No** |
 | CV Structured Outputs | Synthetic structured observations | VisionMortis pipeline architectural specifications (multimodal fusion testbeds) | Simulated multi-image deep neural network output distributions with classification uncertainty | **No** |
 
-## 6. Governance & Disclaimer
+## 7. Governance & Disclaimer
 
 VisionMortis is a research prototype for educational and experimental purposes. All case data in this dataset is literature/data-informed **synthetic** data — it does not represent real forensic cases and has not been validated against real forensic ground truth.
 
