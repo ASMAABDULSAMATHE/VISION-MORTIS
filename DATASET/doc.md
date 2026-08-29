@@ -1,7 +1,7 @@
 # VisionMortis — Protocol One
 ## Master Multimodal Dataset — Reference Documentation
 
-> Case-level records are provided separately as [`visionmortis_master_multimodal.csv`](DATASET/visionmortis_master_multimodal.csv).
+> Case-level records are provided separately as [`visionmortis_master_multimodal.csv`](visionmortis_master_multimodal.csv).
 
 ---
 
