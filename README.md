@@ -75,7 +75,7 @@ Future work may include:
 ## Authors
 
 **Protocol One — 2026**
-Developed as part of an internship at the International Center for Forensic Sciences (ICFS), Dubai Police.
+<p>Developed as part of an internship at the International Center for Forensic Sciences (ICFS), Dubai Police.</p>
 
 - Ghaya AlMatboona
 - Ayesha Moazzam
