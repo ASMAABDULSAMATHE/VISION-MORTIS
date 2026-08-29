@@ -82,7 +82,7 @@ Every CV-derived field is a **separate column** from its manual-observation coun
 | 2. Livor Mortis | `livor_stage`, `livor_observation_confidence` | 93.6% | Hypostasis fixation dynamics & color transitions | Fully Integrated |
 | 3. Rigor Mortis | `rigor_stage`, `rigor_observation_confidence` | 91.8% | Nysten's law & thermal acceleration kinetics | Fully Integrated |
 | 4. Decomposition | 19 morphological binary indicators, score, stage | 100.0% | geoFOR & Megyesi Total Body Score (TBS) | Fully Integrated |
-| 5. Entomology | `insect_present`, `insect_species`, `insect_stage` | 100.0% | OJP taxa reference & ADD developmental succession | Fully Integrated |
+| 5. Entomology | `insect_present`, `insect_species`, `insect_developmental_stage` | 100.0% | OJP taxa reference & ADD developmental succession | Fully Integrated |
 | 6. Metabolomics | 11 metabolites (hypoxanthine, choline, cadaverine, etc.) | 88.2% | Empirical post-mortem biomarker kinetic distributions | Embedded in Master CSV |
 | 7. Environmental Context | `ambient_temp`, `humidity`, `body_mass`, `clothing`, `site` | 100.0% | Scene microclimate & deposition taphonomy | Fully Integrated |
 | 8. Movement / Context | `body_movement_position_change`, `movement_conf` | 100.0% | Scene manipulation context (Non-clock evidence) | Fully Integrated |
