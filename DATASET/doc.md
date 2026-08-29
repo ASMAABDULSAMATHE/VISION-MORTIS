@@ -24,10 +24,11 @@ VisionMortis is a research prototype supporting post-mortem interval (PMI) estim
 
 
 ## 2. Preprocessing
-### 1. Target
+
+### 2.1 Target
 `synthetic_pmi_hours` is the regression target only. Excluded from all predictor matrices in `training_preprocessed.csv`, `validation_preprocessed.csv`, `test_preprocessed.csv` — it appears in those files as a clearly-named target column, not mixed into the feature columns.
 
-### 2. Split
+### 2.2 Split
 - Split by `case_id`, 70/15/15 (train=350, val=75, test=75), stratified on PMI quintile bin, `random_state=42`.
 - Verified zero `case_id` overlap between all three partitions.
 - Target distribution by split:
@@ -40,7 +41,7 @@ VisionMortis is a research prototype supporting post-mortem interval (PMI) estim
 
 Medians differ somewhat across splits (a consequence of the small n=500 and heavy right-skew, skew=2.08). Stratification by quintile keeps means reasonably aligned; a log-PMI stratification was considered but not applied, since qcut on raw PMI already produced adequately balanced bins for this sample size.
 
-### 3. Leakage decisions
+### 2.3 Leakage decisions
 
 | Excluded from predictors | Reason |
 |---|---|
@@ -49,13 +50,13 @@ Medians differ somewhat across splits (a consequence of the small n=500 and heav
 | `data_origin`, `validation_status`, `metabolomics_synthetic_flag` | Constant-value provenance/metadata, zero variance, no predictive content |
 
 
-### 4. Numeric features
+### 2.4 Numeric features
 - All numeric predictors: **both raw (original units) and train-fit z-scored** versions are output (`{col}__raw`, `{col}__scaled`), so downstream modeling can choose either representation without needing to re-fit.
 - Scaler mean/std computed **only on the training split**; applied unchanged to validation and test.
 - A `{col}__missing` binary indicator is emitted alongside every numeric feature with any missingness (metabolomics analytes, `body_temperature_C`).
 - No values were clipped, imputed, or removed. Per Data Dictionary guidance, `body_temperature_C` is preserved even where it has plateaued near ambient (not clipped), since the plateau itself is informative to a downstream model about signal saturation.
 
-### 5. Ordinal categoricals
+### 2.5 Ordinal categoricals
 Encoded to integer order reflecting genuine temporal/severity progression, with "Unobservable"/"Unknown"/"No activity" encoded as **their own explicit level** (lowest, or a dedicated level) rather than collapsed into missing:
 
 - `livor_stage`, `cv_livor_stage`: Unobservable → Not detectable → Early/patchy → Confluent/blanches → Partially fixed → Fully fixed
@@ -66,11 +67,11 @@ Encoded to integer order reflecting genuine temporal/severity progression, with 
 
 A `{col}__missing` flag is also emitted for true NaNs in the CV-mirrored stage columns (where `cv_available = 0`).
 
-### 6. Nominal categoricals
+### 2.6 Nominal categoricals
 One-hot encoded: `clothing`, `deposition_site`, `insect_species`. Category set fixed from the **training split only**; any category appearing only in val/test would map to all-zero indicator columns (none occurred in this run, but the mechanism is in place).
 
 
-### 8. Manual vs. CV provenance
+### 2.7 Manual vs. CV provenance
 Every CV-derived field is a **separate column** from its manual-observation counterpart (`livor_stage` vs. `cv_livor_stage`, etc.) — never merged. `cv_available` is preserved as its own availability gate; **`cv_available = 0` is never treated as evidence of absence for the corresponding phenomenon** — it produces `NaN`/missing in the CV columns, not a negative value.
 
 ## 3. Modality Integration & Statistical Profile
