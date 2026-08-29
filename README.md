@@ -54,6 +54,32 @@ Report
 The current prototype uses literature-informed synthetic data for development and model training.
 
 The model is evaluated using held-out synthetic data. These results demonstrate the potential of the approach but do not represent validation against real forensic ground truth.
+### Trained Model
+
+The trained XGBoost model used in this prototype is included in this repository:
+
+- **Location:** `XGBoost_SHAP/model.py`
+- **Input:** Seven forensic indicators 
+  1. Livor mortis
+  2. Decomposition stage
+  3. Entomological evidence
+  4. Environmental temperature
+  5. Body positioning
+  6. Scene photographs
+  7. Metabolites
+- **Output:** PMI point estimate with confidence interval
+
+### SHAP Analysis
+
+The SHAP analysis shows which indicators drove each PMI prediction and by how much, allowing examiners to identify which evidence to review more closely.
+
+- **Location:** `XGBoost_SHAP/shap.py`
+<p align="center">
+  <img width="805" height="940" alt="SHAP feature importance summary plot" src="https://github.com/user-attachments/assets/647fa1c4-354d-49aa-b117-64960e6a54c3" /><br>
+  <em>Figure: SHAP Feature Importance Summary</em>
+</p>
+
+> Each dot represents a case in the test set. Color indicates the feature's value (red = high, blue = low); position on the x-axis shows that feature's impact on the predicted PMI. `decomposition_observation_score_scaled` and `decomposition_stage__ordinal` are the strongest drivers of the model's output.
 
 ## Limitations
 
