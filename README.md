@@ -1,4 +1,4 @@
-# VisionMortis — Protocol One
+# VisionMortis - Protocol One
 
 ## AI-Assisted Forensic Decision Support for Post-Mortem Interval Estimation
 
@@ -74,7 +74,7 @@ Future work may include:
 
 ## Authors
 
-**Protocol One — 2026**
+**Protocol One - 2026**
 <p>Developed as part of an internship at the International Center for Forensic Sciences (ICFS), Dubai Police.</p>
 
 - Ghaya AlMatboona
@@ -84,7 +84,7 @@ Future work may include:
 
 ## Repository
 
-VisionMortis — Protocol One
+VisionMortis - Protocol One
 [https://github.com/ASMAABDULSAMATHE/VISION-MORTIS]
 
 ## Originality & Attribution
