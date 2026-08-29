@@ -59,7 +59,7 @@ The model is evaluated using held-out synthetic data. These results demonstrate 
 The trained XGBoost model used in this prototype is included in this repository:
 
 - **Location:** [`XGBoost_SHAP/model.py`](XGBoost_SHAP/Model.py)
-- **Input:** Seven forensic indicators 
+- **Input:** Nine forensic indicators 
   1. Algor mortis
   2. Livor mortis
   3. Rigor mortis
