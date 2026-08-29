@@ -61,12 +61,13 @@ The trained XGBoost model used in this prototype is included in this repository:
 - **Location:** [`XGBoost_SHAP/model.py`](XGBoost_SHAP/Model.py)
 - **Input:** Seven forensic indicators 
   1. Livor mortis
-  2. Decomposition stage
-  3. Entomological evidence
-  4. Environmental temperature
-  5. Body positioning
-  6. Scene photographs
-  7. Metabolites
+  2. Rigor mortis
+  3. Decomposition stage
+  4. Entomological evidence
+  5. Environmental temperature
+  6. Body positioning
+  7. Scene photographs
+  8. Metabolites
 - **Output:** PMI point estimate with confidence interval
 
 ### SHAP Analysis
