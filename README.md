@@ -67,7 +67,7 @@ The trained XGBoost model used in this prototype is included in this repository:
   5. Entomological evidence
   6. Environmental temperature
   7. Metabolites
-  8. Body context
+  8. Body movement
   9. Scene photographs
 
 - **Output:** PMI point estimate with confidence interval
