@@ -75,16 +75,17 @@ Future work may include:
 ## Authors
 
 **Protocol One — 2026**
+Developed as part of an internship at the International Center for Forensic Sciences (ICFS), Dubai Police.
 
-- Ghaya
-- Ayesha
-- Asma
-- Fathima
+- Ghaya AlMatboona
+- Ayesha Moazzam
+- Asma Abdul Samathe
+- Fathima Shafriya
 
 ## Repository
 
 VisionMortis — Protocol One
-[]
+[https://github.com/ASMAABDULSAMATHE/VISION-MORTIS]
 
 ## Originality & Attribution
 
