@@ -408,18 +408,11 @@ export default function App() {
       badge: caseData.metabolomics.enabled ? `${caseData.metabolomics.vitreousPotassiumMmolL} mmol/L` : "Off",
     },
     {
-      id: "overview",
-      label: "9. AI Synthesis & Model",
-      icon: Sparkles,
-      status: "active",
-      badge: `${pmiResult.estimatedPmiOptimalHours}h (${pmiResult.confidenceScore}%)`,
-    },
-    {
       id: "report",
-      label: "10. Generated Case Report",
+      label: "9. Final Synthesis & Report",
       icon: FileText,
       status: activePage === "report" ? "active" : "inactive",
-      badge: activePage === "report" ? "Active View" : "Report Page",
+      badge: activePage === "report" ? "Active View" : `${pmiResult.estimatedPmiOptimalHours}h`,
     },
   ];
 
@@ -444,10 +437,13 @@ export default function App() {
   }, []);
 
   const handleNavigateToSection = (sectionId: string) => {
-    if (sectionId === "report") {
+    if (sectionId === "report" || sectionId === "overview") {
       setActivePage("report");
       setActiveWorkflowSection("report");
       window.scrollTo({ top: 0, behavior: "smooth" });
+      if (!aiSynthesisData && !isAiLoading) {
+        handleRunAiSynthesis();
+      }
       if (window.innerWidth < 1024) {
         setIsWorkflowSidebarOpen(false);
       }
@@ -464,7 +460,7 @@ export default function App() {
     if (sectionId === "metadata") {
       setMetadataCollapsed(false);
     }
-    const targetId = sectionId === "overview" ? "overview-card" : `${sectionId}-card`;
+    const targetId = `${sectionId}-card`;
     
     // Give accordion state a brief tick to expand so scroll calculates the exact beginning of the card
     setTimeout(() => {
@@ -541,6 +537,9 @@ export default function App() {
                 setActivePage("report");
                 setActiveWorkflowSection("report");
                 window.scrollTo({ top: 0, behavior: "smooth" });
+                if (!aiSynthesisData && !isAiLoading) {
+                  handleRunAiSynthesis();
+                }
               }}
               className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 activePage === "report"
@@ -644,7 +643,7 @@ export default function App() {
                 <span className="font-mono text-teal-400 font-bold">{caseData.caseId || "None"}</span>
               </div>
               <div className="font-semibold text-slate-200 truncate">
-                {caseData.subjectNameOrIdentifier || "Unassigned Subject"}
+                {caseData.presetName || caseData.subjectNameOrIdentifier || "Unassigned Subject"}
               </div>
               <div className="text-xs text-slate-400 flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
@@ -652,29 +651,51 @@ export default function App() {
               </div>
 
               {/* Sidebar Quick Case Preset Switcher */}
-              <div className="pt-2 border-t border-slate-800/60 space-y-1">
-                <label className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
-                  <FileSpreadsheet className="w-3 h-3 text-teal-400" />
-                  <span>Preset Benchmark Case:</span>
-                </label>
-                <select
-                  value=""
-                  onChange={(e) => {
-                    const idx = parseInt(e.target.value, 10);
-                    if (!isNaN(idx) && FORENSIC_PRESETS[idx]) {
-                      setCaseData(FORENSIC_PRESETS[idx]);
-                      setAiSynthesisData(null);
-                    }
-                  }}
-                  className="w-full bg-slate-900 border border-slate-700/80 hover:border-teal-500/80 rounded-lg px-2 py-1 text-[11px] text-teal-300 focus:outline-none focus:border-teal-400 cursor-pointer truncate"
-                >
-                  <option value="" disabled>Switch preset case...</option>
-                  {FORENSIC_PRESETS.map((preset, idx) => (
-                    <option key={preset.caseId} value={idx}>
-                      {preset.caseId}: {preset.subjectNameOrIdentifier}
-                    </option>
-                  ))}
-                </select>
+              <div className="pt-2 border-t border-slate-800/60 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                    <FileSpreadsheet className="w-3 h-3 text-teal-400" />
+                    <span>Preset Case:</span>
+                  </label>
+                  {caseData.isHarmonicPreset && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                      Harmonic
+                    </span>
+                  )}
+                </div>
+                {(() => {
+                  const activePresetIdx = FORENSIC_PRESETS.findIndex(
+                    (p) => (caseData.presetId && p.presetId === caseData.presetId) || p.caseId === caseData.caseId
+                  );
+                  return (
+                    <>
+                      <select
+                        value={activePresetIdx >= 0 ? activePresetIdx : ""}
+                        onChange={(e) => {
+                          const idx = parseInt(e.target.value, 10);
+                          if (!isNaN(idx) && FORENSIC_PRESETS[idx]) {
+                            setCaseData(FORENSIC_PRESETS[idx]);
+                            setAiSynthesisData(null);
+                          }
+                        }}
+                        className="w-full bg-slate-900 border border-slate-700/80 hover:border-teal-500/80 rounded-lg px-2 py-1.5 text-[11px] text-teal-300 focus:outline-none focus:border-teal-400 cursor-pointer truncate"
+                      >
+                        <option value="" disabled>Select benchmark preset...</option>
+                        {FORENSIC_PRESETS.map((preset, idx) => (
+                          <option key={preset.presetId || preset.caseId || idx} value={idx}>
+                            {preset.presetName || `${preset.caseId}: ${preset.subjectNameOrIdentifier}`}
+                          </option>
+                        ))}
+                      </select>
+                      {activePresetIdx >= 0 && (
+                        <div className="text-[10px] text-teal-300 font-medium truncate flex items-center gap-1 mt-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
+                          <span className="truncate">Selected: {FORENSIC_PRESETS[activePresetIdx].presetCategory}</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
@@ -815,6 +836,8 @@ export default function App() {
                 visionData={visionData}
                 onScrollToSection={(sectionId) => handleNavigateToSection(sectionId)}
                 onBackToWorkspace={(modKey) => handleNavigateToSection(modKey || "metadata")}
+                onRunAiSynthesis={handleRunAiSynthesis}
+                isAiLoading={isAiLoading}
               />
             </div>
           ) : (
@@ -864,18 +887,11 @@ export default function App() {
                 <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                   <button
                     type="button"
-                    onClick={() => scrollToElement("overview-card")}
-                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
-                  >
-                    <span>Jump to Synthesis</span>
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => handleNavigateToSection("report")}
                     className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md shadow-teal-950/50 cursor-pointer w-full sm:w-auto justify-center"
                   >
                     <FileText className="w-4 h-4" />
-                    <span>Open Case Report Page</span>
+                    <span>Open Final Synthesis & Report</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -913,32 +929,104 @@ export default function App() {
                     <FileSpreadsheet className="w-3.5 h-3.5 text-teal-400" />
                     <span className="text-[11px] font-semibold text-slate-300">Case Preset:</span>
                   </span>
-                  <span className="text-[10px] font-mono text-teal-400 sm:hidden">
-                    {caseData.caseId || "Loaded"}
-                  </span>
+                  {caseData.isHarmonicPreset ? (
+                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                      Harmonic
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-mono text-teal-400 sm:hidden">
+                      {caseData.caseId || "Loaded"}
+                    </span>
+                  )}
                 </div>
                 <div className="relative min-w-0 flex-1 w-full sm:w-auto">
-                  <select
-                    value=""
-                    onChange={(e) => {
-                      const idx = parseInt(e.target.value, 10);
-                      if (!isNaN(idx) && FORENSIC_PRESETS[idx]) {
-                        setCaseData(FORENSIC_PRESETS[idx]);
-                        setAiSynthesisData(null);
-                      }
-                    }}
-                    className="w-full lg:w-64 max-w-full truncate bg-slate-900 lg:bg-slate-950 border border-slate-700/80 hover:border-teal-500/80 rounded-xl px-2.5 py-1.5 text-xs text-teal-300 focus:outline-none focus:border-teal-400 cursor-pointer shadow-sm"
-                  >
-                    <option value="" disabled>Load benchmark case...</option>
-                    {FORENSIC_PRESETS.map((preset, idx) => (
-                      <option key={preset.caseId} value={idx}>
-                        {preset.caseId}: {preset.subjectNameOrIdentifier}
-                      </option>
-                    ))}
-                  </select>
+                  {(() => {
+                    const activePresetIdx = FORENSIC_PRESETS.findIndex(
+                      (p) => (caseData.presetId && p.presetId === caseData.presetId) || p.caseId === caseData.caseId
+                    );
+                    return (
+                      <select
+                        value={activePresetIdx >= 0 ? activePresetIdx : ""}
+                        onChange={(e) => {
+                          const idx = parseInt(e.target.value, 10);
+                          if (!isNaN(idx) && FORENSIC_PRESETS[idx]) {
+                            setCaseData(FORENSIC_PRESETS[idx]);
+                            setAiSynthesisData(null);
+                          }
+                        }}
+                        className="w-full lg:w-72 max-w-full truncate bg-slate-900 lg:bg-slate-950 border border-slate-700/80 hover:border-teal-500/80 rounded-xl px-2.5 py-1.5 text-xs text-teal-300 focus:outline-none focus:border-teal-400 cursor-pointer shadow-sm"
+                      >
+                        <option value="" disabled>Load benchmark case...</option>
+                        {FORENSIC_PRESETS.map((preset, idx) => (
+                          <option key={preset.presetId || preset.caseId || idx} value={idx}>
+                            {preset.presetName || `${preset.caseId}: ${preset.subjectNameOrIdentifier}`}
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
+
+            {/* Active Preset Case Status Banner & Quick-Selection Buttons */}
+            {(() => {
+              const activePresetIdx = FORENSIC_PRESETS.findIndex(
+                (p) => (caseData.presetId && p.presetId === caseData.presetId) || p.caseId === caseData.caseId
+              );
+              return (
+                <div className="p-3 bg-slate-950/80 rounded-xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <span className="text-[10px] uppercase font-bold text-slate-500">Active Preset Case:</span>
+                    <span className="font-semibold text-slate-100 flex items-center gap-1.5 truncate">
+                      <span className="w-2 h-2 rounded-full bg-teal-400 shrink-0" />
+                      {caseData.presetName || (activePresetIdx >= 0 ? FORENSIC_PRESETS[activePresetIdx].presetName : caseData.subjectNameOrIdentifier)}
+                    </span>
+                    {caseData.isHarmonicPreset ? (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-950/90 text-emerald-300 border border-emerald-800">
+                        ✓ Harmonic Baseline (0 Conflicts)
+                      </span>
+                    ) : caseData.presetCategory ? (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-950/90 text-amber-300 border border-amber-800">
+                        {caseData.presetCategory}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-wrap w-full md:w-auto">
+                    {FORENSIC_PRESETS.map((preset, idx) => {
+                      const isActive = activePresetIdx === idx;
+                      return (
+                        <button
+                          key={preset.presetId || idx}
+                          type="button"
+                          onClick={() => {
+                            setCaseData(preset);
+                            setAiSynthesisData(null);
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all cursor-pointer ${
+                            isActive
+                              ? "bg-teal-600 text-white shadow-md shadow-teal-950/50 ring-1 ring-teal-400"
+                              : "bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:border-teal-800"
+                          }`}
+                          title={preset.presetDescription || preset.presetName}
+                        >
+                          {idx === 0
+                            ? "Normal (0–6h)"
+                            : idx === 1
+                            ? "Normal (28–32h)"
+                            : idx === 2
+                            ? "Normal (5–6d)"
+                            : idx === 3
+                            ? "Relocation Conflict"
+                            : "Cold Exposure"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {!metadataCollapsed && (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 text-xs animate-in fade-in duration-150">
@@ -1221,34 +1309,7 @@ export default function App() {
             />
           </div>
 
-          {/* Section 9: Final Comprehensive AI Forensic Analysis & PMI Estimation Hub */}
-          <div id="overview-card" className="scroll-mt-24 pt-2">
-            <div className="flex items-center justify-between mb-3 px-1">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse" />
-                <h2 className="text-sm font-bold uppercase tracking-wider text-teal-400">
-                  Final Synthesis & PMI Estimation
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleNavigateToSection("report")}
-                className="text-xs text-teal-400 hover:text-teal-300 font-semibold flex items-center gap-1 cursor-pointer"
-              >
-                <span>Open Dedicated Case Report Page</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <PmiOutputPanel
-              result={pmiResult}
-              caseData={caseData}
-              onRunAiSynthesis={handleRunAiSynthesis}
-              isAiLoading={isAiLoading}
-              onOpenReportModal={() => handleNavigateToSection("report")}
-            />
-          </div>
-
-          {/* Bottom Card: Proceed to Full Report Page */}
+          {/* Bottom Card: Proceed to Final Synthesis & Case Report Page */}
           <div className="rounded-2xl bg-gradient-to-r from-teal-950/90 via-slate-900 to-slate-900 border border-teal-500/50 p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xl">
             <div className="flex items-center gap-3.5">
               <div className="w-12 h-12 rounded-xl bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-300 shrink-0">
@@ -1257,14 +1318,14 @@ export default function App() {
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-base font-bold text-slate-100">
-                    Case Report
+                    Final Synthesis & Official Case Report
                   </h3>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-teal-900/80 text-teal-300 border border-teal-700">
                     Official Page
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
-                  Ready to print, download PDF, or review evidentiary chain of custody? Proceed to the dedicated report page.
+                  All inputs are synchronized in real-time. Proceed to the report page for full multi-engine synthesis, XGBoost ML explainability, analytical cooling curves, and document export.
                 </p>
               </div>
             </div>
@@ -1273,7 +1334,7 @@ export default function App() {
               onClick={() => handleNavigateToSection("report")}
               className="px-5 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-teal-950/60 cursor-pointer shrink-0 hover:scale-105 active:scale-95"
             >
-              <span>Open Report Page</span>
+              <span>Open Final Synthesis & Report</span>
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>

@@ -25,10 +25,21 @@ import {
   TestTube2,
   CheckCircle2,
   Lock,
+  BarChart3,
+  TrendingUp,
+  LineChart,
+  FileSpreadsheet,
 } from "lucide-react";
 import { RecreatedLogo } from "./RecreatedLogo";
 import { validateCaseId, generateCaseIntegrityHash } from "../utils/validation";
-import { printForensicCaseReport, downloadForensicHtmlReport, exportForensicCaseReportPdf } from "../utils/printReport";
+import { printForensicCaseReport, downloadForensicHtmlReport } from "../utils/printReport";
+import {
+  downloadSvgAsPng,
+  generateHenssgeCoolingSvg,
+  generatePmiDistributionSvg,
+  generateFactorAttributionSvg,
+  downloadAllVisualizationsBundle,
+} from "../utils/chartExport";
 
 interface Props {
   isOpen: boolean;
@@ -68,8 +79,8 @@ export const ReportModal: React.FC<Props> = ({
                         Developed by Protocol One
 ================================================================================
 CASE RECORD & DEMOGRAPHICS:
-• Case / File Number:     ${caseData.caseId || "Not Assigned"} ${caseValidation.isValid ? "[VALIDATED]" : "[FORMAT WARNING]"}
-• Subject Identification: ${caseData.subjectNameOrIdentifier || "Unidentified Doe"}
+• Case / File Number:     ${caseData.caseId || "Not Assigned"}
+${caseData.presetName || caseData.isPresetCase ? `• Preset Reference Case:  ${caseData.presetName || caseData.subjectNameOrIdentifier} [${caseData.presetCategory || "Standard Validation Profile"}]\n• Preset Description:     ${caseData.presetDescription || "Standard forensic benchmark profile"}\n` : ""}• Subject Identification: ${caseData.subjectNameOrIdentifier || "Unidentified Doe"}
 • Estimated Age / Sex:    ${caseData.ageYears ? `${caseData.ageYears} years` : "Unspecified"} / ${caseData.sex.toUpperCase()}
 • Primary Pathologist:    ${caseData.investigatorName || "Staff Medical Examiner"}
 • Scene Location:         ${caseData.locationDescription || "Scene"}
@@ -251,328 +262,15 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
   };
 
   const handleDownloadHtml = () => {
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>VisionMortis Forensic Case Report - ${caseData.caseId || "Case"}</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: #0b1120;
-      color: #e2e8f0;
-      margin: 0;
-      padding: 30px;
-      line-height: 1.6;
-    }
-    .container {
-      max-width: 920px;
-      margin: 0 auto;
-      background: #0f172a;
-      border: 1px solid #1e293b;
-      border-radius: 16px;
-      padding: 36px;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 2px solid #14b8a6;
-      padding-bottom: 20px;
-      margin-bottom: 24px;
-    }
-    .brand-title {
-      font-size: 24px;
-      font-weight: 800;
-      color: #ffffff;
-      letter-spacing: -0.5px;
-    }
-    .badge-p1 {
-      display: inline-block;
-      background: #134e4a;
-      color: #2dd4bf;
-      border: 1px solid #0d9488;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 6px;
-      margin-left: 8px;
-    }
-    .gold-badge {
-      color: #D4AF37;
-      font-weight: 700;
-      text-transform: uppercase;
-      font-size: 11px;
-      letter-spacing: 1px;
-      margin-top: 4px;
-    }
-    .pmi-card {
-      background: linear-gradient(135deg, #134e4a33, #0f172a);
-      border: 1px solid #14b8a6;
-      border-radius: 12px;
-      padding: 24px;
-      margin: 24px 0;
-    }
-    .pmi-highlight {
-      font-size: 28px;
-      font-weight: 800;
-      color: #2dd4bf;
-      font-family: monospace;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-    .card {
-      background: #1e293b;
-      border: 1px solid #334155;
-      padding: 16px;
-      border-radius: 10px;
-    }
-    .card-title {
-      font-size: 11px;
-      text-transform: uppercase;
-      color: #94a3b8;
-      font-weight: 700;
-      margin-bottom: 6px;
-    }
-    .table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 16px 0;
-    }
-    .table th, .table td {
-      border: 1px solid #334155;
-      padding: 10px 14px;
-      font-size: 13px;
-      text-align: left;
-    }
-    .table th {
-      background: #1e293b;
-      color: #94a3b8;
-    }
-    .disclaimer-box {
-      background: rgba(212, 175, 55, 0.1);
-      border: 1px solid #D4AF37;
-      color: #e5c158;
-      padding: 18px;
-      border-radius: 10px;
-      margin-top: 30px;
-      font-size: 12px;
-    }
-    .notes-box {
-      background: #162032;
-      border: 1px solid #293548;
-      border-left: 4px solid #14b8a6;
-      padding: 18px;
-      border-radius: 8px;
-      margin: 20px 0;
-      white-space: pre-wrap;
-      font-size: 13px;
-      color: #cbd5e1;
-    }
-    .signoff-box {
-      margin-top: 30px;
-      padding: 20px;
-      border: 1px dashed #475569;
-      border-radius: 10px;
-      background: #0b1120;
-    }
-    @media print {
-      body { background: #ffffff; color: #000000; padding: 0; }
-      .container { border: none; box-shadow: none; padding: 0; background: #ffffff; }
-      .brand-title { color: #000000; }
-      .card { background: #f8fafc; border: 1px solid #cbd5e1; color: #000000; }
-      .pmi-card { background: #f0fdfa; border: 1px solid #0d9488; color: #000000; }
-      .pmi-highlight { color: #0f766e; }
-      .table th { background: #e2e8f0; color: #000000; }
-      .table th, .table td { border-color: #cbd5e1; color: #000000; }
-      .disclaimer-box { background: #fefce8; border-color: #ca8a04; color: #854d0e; }
-      .notes-box { background: #f8fafc; border-color: #94a3b8; color: #000000; border-left-color: #0f766e; }
-      .signoff-box { border-color: #94a3b8; background: #ffffff; color: #000000; }
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <div>
-        <span class="brand-title">VISIONMORTIS</span>
-        <span class="badge-p1">by Protocol One</span>
-        <div style="color: #94a3b8; font-size: 13px; margin-top: 4px;">Post Mortem Interval Estimation Report</div>
-        <div class="gold-badge">Research Prototype</div>
-      </div>
-      <div style="text-align: right; font-size: 12px; color: #94a3b8;">
-        <div><strong>Case: ${caseData.caseId || "Unassigned"}</strong></div>
-        <div>Date: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</div>
-        <div>Examiner: ${caseData.investigatorName || "Staff Medical Examiner"}</div>
-        <div style="font-family: monospace; font-size: 10px; color: #64748b;">Hash: ${integrityHash}</div>
-      </div>
-    </div>
-
-    <div class="grid">
-      <div class="card">
-        <div class="card-title">Subject Demographics</div>
-        <div><strong>Subject ID:</strong> ${caseData.subjectNameOrIdentifier || "Unidentified"}</div>
-        <div><strong>Age / Sex:</strong> ${caseData.ageYears ? `${caseData.ageYears} yrs` : "Unknown"} / ${caseData.sex}</div>
-        <div><strong>Body Mass:</strong> ${caseData.bodyWeightKg} kg</div>
-      </div>
-      <div class="card">
-        <div class="card-title">Discovery Scene Baseline</div>
-        <div><strong>Scene Location:</strong> ${caseData.locationDescription || "Scene"}</div>
-        <div><strong>Ambient Temperature:</strong> ${caseData.ambientTempC} °C</div>
-        <div><strong>Discovery Position:</strong> ${caseData.bodyFoundPosition.toUpperCase()}</div>
-      </div>
-    </div>
-
-    <div class="pmi-card">
-      <div style="font-size: 13px; font-weight: 700; color: #2dd4bf; text-transform: uppercase;">
-        Multimodal Consensus Post-Mortem Interval (PMI)
-      </div>
-      <div class="pmi-highlight">${result.estimatedPmiMinHours} – ${result.estimatedPmiMaxHours} Hours</div>
-      <div style="font-size: 14px; margin-top: 6px;">
-        Point Optimum: <strong>${result.estimatedPmiOptimalHours} Hours (~${(result.estimatedPmiOptimalHours / 24).toFixed(1)} days)</strong>
-      </div>
-      <div style="font-size: 13px; color: #94a3b8; margin-top: 4px;">
-        Estimated TOD: ${result.estimatedTimeOfDeathMin} to ${result.estimatedTimeOfDeathMax} | Model Harmony: ${result.confidenceScore}% (${result.confidenceTier})
-      </div>
-    </div>
-
-    <h3 style="font-size: 14px; text-transform: uppercase; color: #2dd4bf; margin-top: 24px;">
-      Forensic Indicator Modules Overview
-    </h3>
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Indicator Module</th>
-          <th>Observed Stage / Value</th>
-          <th>Derived Window</th>
-          <th>Relative Weight</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><strong>Algor Mortis (Henssge)</strong></td>
-          <td>${caseData.algorMortis.enabled ? `Rectal: ${caseData.algorMortis.rectalTempC}°C (Cf=${caseData.algorMortis.clothingCoveringFactor})` : "Disabled / Bypassed"}</td>
-          <td>${caseData.algorMortis.enabled ? `0–24h` : "N/A"}</td>
-          <td>${result.indicatorEvaluations.find(e => e.category === "Algor")?.weightInFinalCalculation || 0}%</td>
-        </tr>
-        <tr>
-          <td><strong>Livor Mortis (Hypostasis)</strong></td>
-          <td>${caseData.livorMortis.enabled ? `${caseData.livorMortis.colorHue} (${caseData.livorMortis.blanchability.replace(/_/g, " ")})` : "Disabled / Bypassed"}</td>
-          <td>${caseData.livorMortis.enabled ? `30m–12h` : "N/A"}</td>
-          <td>${result.indicatorEvaluations.find(e => e.category === "Livor")?.weightInFinalCalculation || 0}%</td>
-        </tr>
-        <tr>
-          <td><strong>Rigor Mortis (Nysten)</strong></td>
-          <td>${caseData.rigorMortis.enabled ? `${caseData.rigorMortis.progressionStage.replace(/_/g, " ")}` : "Disabled / Bypassed"}</td>
-          <td>${caseData.rigorMortis.enabled ? `1–36h` : "N/A"}</td>
-          <td>${result.indicatorEvaluations.find(e => e.category === "Rigor")?.weightInFinalCalculation || 0}%</td>
-        </tr>
-        <tr>
-          <td><strong>Decomposition (Megyesi TBS)</strong></td>
-          <td>${caseData.decomposition.enabled ? `TBS ${caseData.decomposition.totalBodyScore}/35` : "Disabled / Bypassed"}</td>
-          <td>${caseData.decomposition.enabled ? `1–30+ days` : "N/A"}</td>
-          <td>${result.indicatorEvaluations.find(e => e.category === "Decomposition")?.weightInFinalCalculation || 0}%</td>
-        </tr>
-        <tr>
-          <td><strong>Forensic Entomology</strong></td>
-          <td>${caseData.entomology.enabled ? `${caseData.entomology.primaryInsectGroup.replace(/_/g, " ")} (${caseData.entomology.developmentalStage.replace(/_/g, " ")})` : "Disabled / Bypassed"}</td>
-          <td>${caseData.entomology.enabled ? `Days–Months` : "N/A"}</td>
-          <td>${result.indicatorEvaluations.find(e => e.category === "Entomology")?.weightInFinalCalculation || 0}%</td>
-        </tr>
-        <tr>
-          <td><strong>Metabolomics [K+]</strong></td>
-          <td>${caseData.metabolomics.enabled ? `${caseData.metabolomics.vitreousPotassiumMmolL} mmol/L` : "Disabled / Bypassed"}</td>
-          <td>${caseData.metabolomics.enabled ? `2–48h` : "N/A"}</td>
-          <td>${result.indicatorEvaluations.find(e => e.category === "Metabolomics")?.weightInFinalCalculation || 0}%</td>
-        </tr>
-      </tbody>
-    </table>
-
-    ${
-      imagesList.length > 0
-        ? `<h3 style="font-size: 14px; text-transform: uppercase; color: #2dd4bf; margin-top: 24px;">Photographic Evidence Log (${imagesList.length} Photos)</h3>
-           <div class="card" style="font-size: 12px;">
-             ${imagesList.map((img, i) => `<div><strong>Photo ${i + 1} (${img.tag || "Scene"}):</strong> ${img.name} ${img.detectedFindings ? `— <em>${img.detectedFindings}</em>` : ""}</div>`).join("")}
-           </div>`
-        : ""
-    }
-
-    <h3 style="font-size: 14px; text-transform: uppercase; color: #2dd4bf; margin-top: 24px;">
-      Examiner's Clinical Notes & Autopsy Observations
-    </h3>
-    <div class="notes-box">${caseData.examinersNotes || "No specific qualitative notes provided by the medical examiner."}</div>
-
-    ${
-      result.inconsistenciesDetected
-        ? `<h3 style="font-size: 14px; text-transform: uppercase; color: #f43f5e; margin-top: 24px;">Detected Physiological Contradictions</h3>
-           ${result.inconsistencyAlerts.map(a => `<div class="card" style="border-color: #e11d48; margin-bottom: 12px;">
-             <strong style="color: #fda4af;">[${a.severity.toUpperCase()}] ${a.title}</strong>
-             <div style="font-size: 12px; margin-top: 4px;">${a.description}</div>
-             <div style="font-size: 11px; color: #fde047; margin-top: 4px;"><strong>Forensic Implication:</strong> ${a.forensicImplication}</div>
-           </div>`).join("")}`
-        : ""
-    }
-
-    ${
-      result.aiSynthesis
-        ? `<h3 style="font-size: 14px; text-transform: uppercase; color: #2dd4bf; margin-top: 24px;">AI Pathologist Synthesis</h3>
-           <p style="font-size: 13px; color: #cbd5e1;">${result.aiSynthesis.expertSummary}</p>`
-        : ""
-    }
-
-    <div class="signoff-box">
-      <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #94a3b8; margin-bottom: 12px;">
-        Digital Chain of Custody & Verification Sign-Off
-      </div>
-      <div style="display: flex; justify-content: space-between; font-size: 12px; margin-top: 10px;">
-        <div>Attending Pathologist: __________________________</div>
-        <div>Signature: __________________________</div>
-        <div>Date: ________________</div>
-      </div>
-    </div>
-
-    <div class="disclaimer-box">
-      <strong>RESEARCH PROTOTYPE & MEDICO-LEGAL DISCLAIMER:</strong><br>
-      VisionMortis is an AI-assisted research prototype engineered by Protocol One for forensic pathology decision-support. Calculations must be correlated with autopsy, scene investigation, toxicology, and histological findings.
-    </div>
-
-    <div style="text-align: center; margin-top: 30px; font-size: 11px; color: #64748b;">
-      VisionMortis • Protocol One Forensic Decision System • Case Report generated on ${new Date().toISOString()} • Security Hash: ${integrityHash}
-    </div>
-  </div>
-</body>
-</html>`;
-
-    const filename = `VisionMortis-Report-${caseData.caseId || "Case"}.html`;
-    triggerFileDownload(html, filename, "text/html;charset=utf-8");
+    downloadForensicHtmlReport(caseData, result, visionData, integrityHash);
     setDownloadSuccess("HTML Report Downloaded");
     setTimeout(() => setDownloadSuccess(null), 3000);
   };
 
-  const handleDownloadPdf = async () => {
-    setDownloadSuccess("Generating PDF Document...");
-    const success = await exportForensicCaseReportPdf(caseData, result, visionData, integrityHash);
-    if (success) {
-      setDownloadSuccess("PDF Report Downloaded");
-    } else {
-      setDownloadSuccess("HTML Fallback Report Downloaded");
-    }
-    setTimeout(() => setDownloadSuccess(null), 3500);
-  };
-
   const handlePrint = () => {
-    setDownloadSuccess("Invoking Print & Generating PDF...");
-    setTimeout(() => setDownloadSuccess(null), 3000);
-    try {
-      printForensicCaseReport(caseData, result, visionData, integrityHash);
-    } catch {
-      window.print();
-    }
+    setDownloadSuccess("PDF & Print Dossier Downloaded!");
+    setTimeout(() => setDownloadSuccess(null), 3500);
+    printForensicCaseReport(caseData, result, visionData, integrityHash);
   };
 
   const handleCopy = () => {
@@ -600,15 +298,6 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
               </div>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-xs text-slate-400">Case #{caseData.caseId || "Unassigned"}</span>
-                {caseValidation.isValid ? (
-                  <span className="text-[10px] text-teal-400 font-mono flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> Validated File Number
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-amber-400 font-mono flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3" /> Format Check Needed
-                  </span>
-                )}
                 <span className="text-[10px] font-bold text-[#D4AF37] tracking-wider uppercase">
                   • Research Prototype
                 </span>
@@ -624,26 +313,63 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
               </span>
             )}
 
+            {/* Download Charts Dropdown / Quick Group */}
+            <div className="flex items-center gap-1 p-1 bg-slate-950/80 border border-slate-800 rounded-xl">
+              <button
+                type="button"
+                onClick={async () => {
+                  setDownloadSuccess("Downloading Henssge Curve PNG...");
+                  const svg = generateHenssgeCoolingSvg(result, caseData);
+                  await downloadSvgAsPng(svg, `Henssge-CoolingCurve-${caseData.caseId || "CASE"}.png`);
+                  setTimeout(() => setDownloadSuccess(null), 3000);
+                }}
+                title="Download Henssge Cooling Trajectory Chart (PNG)"
+                className="px-2 py-1 rounded-lg hover:bg-slate-800 text-teal-400 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <LineChart className="w-3 h-3" />
+                <span>Cooling Curve</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setDownloadSuccess("Downloading PMI Distribution PNG...");
+                  const svg = generatePmiDistributionSvg(result, caseData);
+                  await downloadSvgAsPng(svg, `PMI-ProbabilityDensity-${caseData.caseId || "CASE"}.png`);
+                  setTimeout(() => setDownloadSuccess(null), 3000);
+                }}
+                title="Download PMI Probability Density Curve (PNG)"
+                className="px-2 py-1 rounded-lg hover:bg-slate-800 text-sky-400 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <TrendingUp className="w-3 h-3" />
+                <span>PMI Density</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setDownloadSuccess("Downloading Factor Attribution PNG...");
+                  const svg = generateFactorAttributionSvg(result, null, caseData);
+                  await downloadSvgAsPng(svg, `FactorAttribution-SHAP-${caseData.caseId || "CASE"}.png`);
+                  setTimeout(() => setDownloadSuccess(null), 3000);
+                }}
+                title="Download Factor Attribution & SHAP Chart (PNG)"
+                className="px-2 py-1 rounded-lg hover:bg-slate-800 text-amber-400 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <BarChart3 className="w-3 h-3" />
+                <span>Attribution</span>
+              </button>
+            </div>
+
             {/* Download HTML Button */}
             <button
               type="button"
               onClick={handleDownloadHtml}
-              title="Download standalone HTML Case Report"
+              title="Download standalone HTML Case Report with embedded charts"
               className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-teal-900/60"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>HTML</span>
-            </button>
-
-            {/* Download PDF Button */}
-            <button
-              type="button"
-              onClick={handleDownloadPdf}
-              title="Download direct formatted PDF Case Report"
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-rose-900/60"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>.PDF</span>
+              <span>.HTML</span>
             </button>
 
             {/* Download Text Button */}
@@ -678,14 +404,15 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
               <span>{copied ? "Copied!" : "Copy"}</span>
             </button>
 
-            {/* Print / PDF Button */}
+            {/* Print Button */}
             <button
               type="button"
               onClick={handlePrint}
-              className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-teal-950/40"
+              className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-teal-950/40 cursor-pointer"
+              title="Print or Save as PDF"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print / PDF</span>
+              <span>Print Report</span>
             </button>
 
             {/* Close Button */}
@@ -702,36 +429,72 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
         {/* Printable Document Body */}
         <div id="printable-modal-report" className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6 text-slate-300 text-xs bg-slate-900 leading-relaxed">
           {/* Report Masthead */}
-          <div className="p-5 rounded-2xl bg-slate-950/90 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <RecreatedLogo className="w-10 h-10" showSubtitle={false} />
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-base font-bold text-slate-100 tracking-tight">
+          <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/90 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 overflow-hidden">
+            <div className="flex items-start sm:items-center gap-3 sm:gap-3.5 w-full md:w-auto min-w-0">
+              <RecreatedLogo className="w-10 h-10 shrink-0" showSubtitle={false} />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <h1 className="text-sm sm:text-base font-bold text-slate-100 tracking-tight">
                     VISIONMORTIS FORENSIC DOSSIER
                   </h1>
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-teal-950 text-teal-400 border border-teal-800">
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-teal-950/90 text-teal-400 border border-teal-800 whitespace-nowrap shrink-0">
                     by Protocol One
                   </span>
                 </div>
-                <div className="text-[11px] text-slate-400 mt-0.5">
+                <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">
                   Post Mortem Interval Estimation Report
                 </div>
-                <div className="text-[11px] font-bold text-[#D4AF37] tracking-wider uppercase mt-0.5">
+                <div className="text-[10px] sm:text-[11px] font-bold text-[#D4AF37] tracking-wider uppercase mt-0.5">
                   Research Prototype
                 </div>
               </div>
             </div>
 
-            <div className="text-right text-[11px] space-y-0.5 text-slate-400">
+            <div className="w-full md:w-auto text-left md:text-right text-[11px] space-y-0.5 text-slate-400 pt-2 md:pt-0 border-t md:border-t-0 border-slate-800/60 shrink-0">
               <div>
                 Case ID: <span className="text-teal-400 font-mono font-bold text-xs">{caseData.caseId || "Unassigned"}</span>
               </div>
               <div>Generated: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}</div>
-              <div>Investigator: {caseData.investigatorName || "Staff Medical Examiner"}</div>
-              <div className="text-[10px] font-mono text-slate-500">Hash: {integrityHash}</div>
+              <div>Examiner: {caseData.investigatorName || caseData.examinerName || "Staff Medical Examiner"}</div>
+              <div className="text-[10px] font-mono text-slate-500 break-all">Hash: {integrityHash}</div>
             </div>
           </div>
+
+          {/* Preset Benchmark Case Banner (if preset used) */}
+          {(caseData.presetName || caseData.isPresetCase) && (
+            <div className="p-3.5 rounded-xl bg-teal-950/40 border border-teal-500/40 flex items-start gap-3 text-xs animate-in fade-in duration-150">
+              <div className="w-8 h-8 rounded-lg bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-300 shrink-0 mt-0.5">
+                <FileSpreadsheet className="w-4 h-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-bold text-teal-300 uppercase tracking-wider">
+                    Preset Reference Case Profile:
+                  </span>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-teal-900/80 text-teal-200 border border-teal-700/80">
+                    {caseData.presetCategory || "Benchmark Case"}
+                  </span>
+                  {caseData.isHarmonicPreset ? (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                      ✓ Harmonic Baseline (0 Discordance)
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">
+                      Specialized Profile
+                    </span>
+                  )}
+                </div>
+                <div className="font-bold text-slate-100 text-xs sm:text-sm mt-0.5">
+                  {caseData.presetName || caseData.subjectNameOrIdentifier}
+                </div>
+                {caseData.presetDescription && (
+                  <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                    {caseData.presetDescription}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Demographics & Discovery Baseline */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/60 p-4 rounded-xl border border-slate-800 text-xs">

@@ -87,9 +87,9 @@ export const ResetConfirmationModal: React.FC<Props> = ({
             <span>Or Load a Standardized Sample Case:</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {FORENSIC_PRESETS.slice(0, 4).map((preset, idx) => (
+            {FORENSIC_PRESETS.map((preset, idx) => (
               <button
-                key={preset.caseId || idx}
+                key={preset.presetId || preset.caseId || idx}
                 type="button"
                 onClick={() => {
                   onLoadPreset(preset);
@@ -97,10 +97,20 @@ export const ResetConfirmationModal: React.FC<Props> = ({
                 }}
                 className="text-left p-2.5 rounded-xl bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800/80 hover:border-teal-800 text-xs transition-colors cursor-pointer group"
               >
-                <div className="font-semibold text-slate-200 group-hover:text-teal-300 truncate">
-                  {preset.subjectNameOrIdentifier}
+                <div className="flex items-center justify-between gap-1">
+                  <span className="font-semibold text-slate-200 group-hover:text-teal-300 truncate">
+                    {preset.presetName || preset.subjectNameOrIdentifier}
+                  </span>
+                  {preset.isHarmonicPreset && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 shrink-0">
+                      Harmonic
+                    </span>
+                  )}
                 </div>
-                <div className="text-[10px] text-slate-500 font-mono mt-0.5">{preset.caseId}</div>
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5 flex items-center justify-between">
+                  <span>{preset.caseId}</span>
+                  <span className="text-slate-400 font-sans">{preset.presetCategory}</span>
+                </div>
               </button>
             ))}
           </div>

@@ -18,7 +18,16 @@ import {
   Zap,
   Layers,
   ShieldAlert,
+  Download,
+  FileSpreadsheet,
 } from "lucide-react";
+import {
+  downloadSvgAsPng,
+  generateHenssgeCoolingSvg,
+  generatePmiDistributionSvg,
+  generateFactorAttributionSvg,
+  downloadChartDataAsCsv,
+} from "../utils/chartExport";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -143,23 +152,31 @@ export const PmiOutputPanel: React.FC<Props> = ({
                 {result.estimatedPmiMinHours} – {result.estimatedPmiMaxHours} Hours
               </span>
             </h2>
-            <div className="text-xs text-slate-400 mt-1.5 flex flex-wrap items-center gap-3">
-              <span>
-                Point Optimum: <strong className="text-slate-200 font-mono font-semibold">{formatHoursOrDays(result.estimatedPmiOptimalHours)}</strong>
-              </span>
+            <div className="text-xs text-slate-400 mt-1.5 space-y-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <span>
+                  Point Optimum: <strong className="text-slate-200 font-mono font-semibold">{formatHoursOrDays(result.estimatedPmiOptimalHours)}</strong>
+                </span>
+                <span className="text-slate-600">•</span>
+                <span>
+                  Estimated Time of Death (TOD): <strong className="text-slate-200 font-medium">{result.estimatedTimeOfDeathMin} – {result.estimatedTimeOfDeathMax}</strong>
+                </span>
+              </div>
+
               {mlPredictionData && (
-                <>
-                  <span className="text-slate-600">•</span>
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-emerald-950/80 border border-emerald-700/80 text-emerald-300 font-medium text-[11px]">
-                    <Cpu className="w-3 h-3 text-emerald-400" />
-                    <span>XGBoost ML: <strong className="font-mono text-emerald-200">{mlPredictionData.estimatedPmiOptimalHours} hrs</strong> ({mlPredictionData.estimatedPmiMinHours}–{mlPredictionData.estimatedPmiMaxHours}h)</span>
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-950/90 border border-emerald-700/80 text-emerald-300 font-medium text-[11px]">
+                    <Cpu className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>
+                      XGBoost ML Model Prediction: <strong className="font-mono text-emerald-200 font-bold">{mlPredictionData.estimatedPmiOptimalHours} hrs</strong>
+                      <span className="text-emerald-400/80 ml-1">({mlPredictionData.estimatedPmiMinHours}–{mlPredictionData.estimatedPmiMaxHours}h 95% CI)</span>
+                    </span>
                   </span>
-                </>
+                  <span className="text-[11px] text-slate-400">
+                    (100-tree ensemble evaluated across 212 multi-domain features)
+                  </span>
+                </div>
               )}
-              <span className="text-slate-600">•</span>
-              <span>
-                Estimated Time of Death (TOD): <strong className="text-slate-200 font-medium">{result.estimatedTimeOfDeathMin} – {result.estimatedTimeOfDeathMax}</strong>
-              </span>
             </div>
           </div>
 
@@ -231,47 +248,22 @@ export const PmiOutputPanel: React.FC<Props> = ({
           </div>
         )}
 
-        {/* Action Controls: AI Synthesis & Report Generator */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-          <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={onRunAiSynthesis}
-              disabled={isAiLoading}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-semibold text-xs flex items-center gap-2 shadow-md shadow-teal-950/40 transition-all cursor-pointer disabled:opacity-50"
-            >
-              {isAiLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Synthesizing Deep Forensic AI Assessment...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  <span>Run Deep AI Pathologist Synthesis</span>
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={onOpenReportModal}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-medium text-xs flex items-center gap-2 border border-slate-700 transition-colors cursor-pointer"
-            >
-              <FileText className="w-4 h-4 text-teal-400" />
-              <span>Generate Case Report</span>
-            </button>
+        {/* Dominant Anchors Summary */}
+        {result.dominantIndicatorSummary?.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-800/80 text-xs text-slate-400">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-slate-300">Dominant Anchors:</span>
+              {result.dominantIndicatorSummary.map((item, idx) => (
+                <span key={idx} className="px-2.5 py-1 rounded-md bg-slate-800 text-teal-300 border border-slate-700 text-xs font-medium">
+                  {item}
+                </span>
+              ))}
+            </div>
+            <div className="text-[11px] text-slate-500 font-mono">
+              Evaluated across 6 forensic modules + XGBoost TreeSHAP
+            </div>
           </div>
-
-          <div className="text-xs text-slate-400 flex items-center gap-2">
-            <span>Dominant Anchor:</span>
-            {result.dominantIndicatorSummary.slice(0, 2).map((item, idx) => (
-              <span key={idx} className="px-2.5 py-1 rounded-md bg-slate-800 text-teal-300 border border-slate-700 text-xs font-medium">
-                {item}
-              </span>
-            ))}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Analytical Tabbed Panel */}
@@ -395,9 +387,46 @@ export const PmiOutputPanel: React.FC<Props> = ({
 
                 {/* TreeSHAP Feature Attributions Waterfall / List */}
                 <div className="space-y-2.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <h4 className="font-semibold text-slate-200">Top TreeSHAP Feature Contributions</h4>
-                    <span className="text-slate-400 text-[11px]">Ranked by absolute |SHAP| hours impact</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div>
+                      <h4 className="font-semibold text-slate-200">Top TreeSHAP Feature Contributions</h4>
+                      <span className="text-slate-400 text-[11px]">Ranked by absolute |SHAP| hours impact</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const svg = generateFactorAttributionSvg(result, mlPredictionData, caseData);
+                          await downloadSvgAsPng(svg, `TreeSHAP-Attribution-${caseData?.caseId || "CASE"}.png`);
+                        }}
+                        title="Download TreeSHAP Waterfall Chart (PNG)"
+                        className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 text-[11px] font-medium flex items-center gap-1 cursor-pointer border border-slate-700 transition-colors"
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>PNG</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          downloadChartDataAsCsv(
+                            mlPredictionData.factorAttributions?.map((attr: any) => ({
+                              Feature: attr.factorName,
+                              ImpactDirection: attr.impactDirection,
+                              ImpactHours: attr.pullMagnitudeHours,
+                              RelativeImportancePercent: attr.relativeImportancePercent,
+                              Explanation: attr.explanation,
+                            })) || [],
+                            `TreeSHAP-Attribution-${caseData?.caseId || "CASE"}.csv`
+                          );
+                        }}
+                        title="Export TreeSHAP data table as CSV"
+                        className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium flex items-center gap-1 cursor-pointer border border-slate-700 transition-colors"
+                      >
+                        <FileSpreadsheet className="w-3 h-3 text-emerald-400" />
+                        <span>CSV</span>
+                      </button>
+                    </div>
                   </div>
 
                   {mlPredictionData.factorAttributions?.map((attr: any, idx: number) => {
@@ -450,12 +479,46 @@ export const PmiOutputPanel: React.FC<Props> = ({
         {/* Tab Content 1: Factor Attribution */}
         {activeTab === "attribution" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
               <div>
                 <h4 className="font-semibold text-slate-200">Indicator Weight & Directional Attribution</h4>
                 <p className="text-slate-400 text-xs mt-0.5">
                   Multimodal feature contribution: shows which physiological indicators pull the post-mortem interval earlier or later
                 </p>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const svg = generateFactorAttributionSvg(result, mlPredictionData, caseData);
+                    await downloadSvgAsPng(svg, `FactorAttribution-${caseData?.caseId || "CASE"}.png`);
+                  }}
+                  title="Download Factor Attribution chart as high-res PNG"
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 text-[11px] font-medium flex items-center gap-1 cursor-pointer border border-slate-700 transition-colors"
+                >
+                  <Download className="w-3 h-3" />
+                  <span>PNG</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    downloadChartDataAsCsv(
+                      result.factorAttributions.map(f => ({
+                        Factor: f.factorName,
+                        Direction: f.impactDirection,
+                        WeightPercent: f.relativeImportancePercent,
+                        Explanation: f.explanation,
+                      })),
+                      `FactorAttribution-${caseData?.caseId || "CASE"}.csv`
+                    );
+                  }}
+                  title="Export Factor Attribution table as CSV"
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium flex items-center gap-1 cursor-pointer border border-slate-700 transition-colors"
+                >
+                  <FileSpreadsheet className="w-3 h-3 text-emerald-400" />
+                  <span>CSV</span>
+                </button>
               </div>
             </div>
 
@@ -556,13 +619,49 @@ export const PmiOutputPanel: React.FC<Props> = ({
         {/* Tab Content 2: Henssge Cooling Trajectory */}
         {activeTab === "cooling" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
               <div>
                 <h4 className="font-semibold text-slate-200">Algor Mortis Henssge Double-Exponential Cooling Curve</h4>
                 <p className="text-slate-400 text-xs mt-0.5">
                   Core body temperature cooling trajectory vs post-mortem hours with 95% confidence bounds
                 </p>
               </div>
+
+              {result.coolingCurveData.length > 0 && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const svg = generateHenssgeCoolingSvg(result, caseData);
+                      await downloadSvgAsPng(svg, `Henssge-CoolingCurve-${caseData?.caseId || "CASE"}.png`);
+                    }}
+                    title="Download Henssge Cooling Curve as high-res PNG"
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 text-[11px] font-medium flex items-center gap-1 cursor-pointer border border-slate-700 transition-colors"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>PNG</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      downloadChartDataAsCsv(
+                        result.coolingCurveData.map(c => ({
+                          PostMortemHour: c.hour,
+                          CoreTemperatureC: c.temperature,
+                          Lower95ConfidenceC: c.lowerConfidence,
+                          Upper95ConfidenceC: c.upperConfidence,
+                        })),
+                        `Henssge-CoolingCurve-${caseData?.caseId || "CASE"}.csv`
+                      );
+                    }}
+                    title="Export Cooling Curve data points as CSV"
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium flex items-center gap-1 cursor-pointer border border-slate-700 transition-colors"
+                  >
+                    <FileSpreadsheet className="w-3 h-3 text-emerald-400" />
+                    <span>CSV</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {result.coolingCurveData.length > 0 ? (
@@ -638,13 +737,47 @@ export const PmiOutputPanel: React.FC<Props> = ({
         {/* Tab Content 3: PMI Probability Density */}
         {activeTab === "distribution" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
               <div>
                 <h4 className="font-semibold text-slate-200">Composite Post-Mortem Interval Probability Distribution</h4>
                 <p className="text-slate-400 text-xs mt-0.5">
                   Gaussian density synthesis combining all active physiological indicators
                 </p>
               </div>
+
+              {result.probabilityDistribution.length > 0 && (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const svg = generatePmiDistributionSvg(result, caseData);
+                      await downloadSvgAsPng(svg, `PMI-ProbabilityDensity-${caseData?.caseId || "CASE"}.png`);
+                    }}
+                    title="Download Probability Distribution as high-res PNG"
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 text-[11px] font-medium flex items-center gap-1 cursor-pointer border border-slate-700 transition-colors"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>PNG</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      downloadChartDataAsCsv(
+                        result.probabilityDistribution.map(p => ({
+                          PostMortemHour: p.pmiHours,
+                          ProbabilityDensityPercent: p.probability,
+                        })),
+                        `PMI-ProbabilityDensity-${caseData?.caseId || "CASE"}.csv`
+                      );
+                    }}
+                    title="Export Probability Density distribution as CSV"
+                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium flex items-center gap-1 cursor-pointer border border-slate-700 transition-colors"
+                  >
+                    <FileSpreadsheet className="w-3 h-3 text-emerald-400" />
+                    <span>CSV</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {result.probabilityDistribution.length > 0 ? (

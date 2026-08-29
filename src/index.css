@@ -77,8 +77,8 @@ body {
   }
 
   body, html, #root, main {
-    background-color: #ffffff !important;
-    color: #0f172a !important;
+    background-color: #020617 !important;
+    color: #f8fafc !important;
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
@@ -96,12 +96,22 @@ body {
     padding: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-    background-color: #ffffff !important;
-    color: #0f172a !important;
+    background-color: transparent !important;
   }
 
-  #generated-report-section * {
-    color: inherit;
+  /* When modal is printed, expand it cleanly across pages */
+  .fixed.inset-0 {
+    position: static !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  #printable-modal-report {
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    width: 100% !important;
   }
 
   .break-inside-avoid {

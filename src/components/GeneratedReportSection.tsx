@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { ForensicCaseInput, PmiCalculationResult, VisionDetectionData } from "../types";
 import {
   Printer,
@@ -26,10 +26,30 @@ import {
   ArrowUp,
   Image as ImageIcon,
   ArrowLeft,
+  Cpu,
+  Zap,
+  RefreshCw,
+  Loader2,
+  TrendingUp,
+  BarChart3,
+  LineChart,
+  ChevronDown,
+  ChevronUp,
+  FileSpreadsheet,
 } from "lucide-react";
 import { RecreatedLogo } from "./RecreatedLogo";
 import { validateCaseId, generateCaseIntegrityHash } from "../utils/validation";
-import { printForensicCaseReport, downloadForensicHtmlReport, exportForensicCaseReportPdf } from "../utils/printReport";
+import { printForensicCaseReport, downloadForensicHtmlReport } from "../utils/printReport";
+import { runInBrowserXgbPrediction } from "../utils/inBrowserXgbModel";
+import { PmiOutputPanel } from "./PmiOutputPanel";
+import {
+  downloadSvgAsPng,
+  generateHenssgeCoolingSvg,
+  generatePmiDistributionSvg,
+  generateFactorAttributionSvg,
+  downloadChartDataAsCsv,
+  downloadAllVisualizationsBundle,
+} from "../utils/chartExport";
 
 interface Props {
   caseData: ForensicCaseInput;
@@ -37,6 +57,8 @@ interface Props {
   visionData?: VisionDetectionData;
   onScrollToSection?: (sectionId: string) => void;
   onBackToWorkspace?: (targetModule?: string) => void;
+  onRunAiSynthesis?: () => void;
+  isAiLoading?: boolean;
 }
 
 export const GeneratedReportSection: React.FC<Props> = ({
@@ -45,9 +67,30 @@ export const GeneratedReportSection: React.FC<Props> = ({
   visionData,
   onScrollToSection,
   onBackToWorkspace,
+  onRunAiSynthesis,
+  isAiLoading = false,
 }) => {
   const [copied, setCopied] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
+  const [showFullSynthesisPanel, setShowFullSynthesisPanel] = useState(true);
+
+  // Automatically execute in-browser XGBoost 100-Tree regressor and TreeSHAP explainability (212 features)
+  const { mlPredictionData, inBrowserExecTimeMs } = useMemo(() => {
+    const startTime = performance.now();
+    const pred = runInBrowserXgbPrediction(caseData);
+    const endTime = performance.now();
+    return {
+      mlPredictionData: pred,
+      inBrowserExecTimeMs: (endTime - startTime).toFixed(1),
+    };
+  }, [caseData]);
+
+  // Automatically execute AI Pathologist Synthesis when navigating to the Reports page if not yet synthesized
+  useEffect(() => {
+    if (!result.aiSynthesis && onRunAiSynthesis && !isAiLoading) {
+      onRunAiSynthesis();
+    }
+  }, []);
 
   const caseValidation = validateCaseId(caseData.caseId);
   const integrityHash = generateCaseIntegrityHash(
@@ -67,10 +110,11 @@ export const GeneratedReportSection: React.FC<Props> = ({
                         Developed by Protocol One
 ================================================================================
 CASE RECORD & DEMOGRAPHICS:
-• Case / File Number:     ${caseData.caseId || "Not Assigned"} ${caseValidation.isValid ? "[VALIDATED]" : "[FORMAT WARNING]"}
-• Subject Identification: ${caseData.subjectNameOrIdentifier || "Unidentified Doe"}
-• Estimated Age / Sex:    ${caseData.ageYears ? `${caseData.ageYears} years` : "Unspecified"} / ${caseData.sex.toUpperCase()}
-• Primary Pathologist:    ${caseData.investigatorName || "Staff Medical Examiner"}
+• Case / File Number:     ${caseData.caseId || "Not Assigned"}
+${caseData.presetName || caseData.isPresetCase ? `• Preset Reference Case:  ${caseData.presetName || caseData.subjectNameOrIdentifier} [${caseData.presetCategory || "Standard Validation Profile"}]\n• Preset Description:     ${caseData.presetDescription || "Standard forensic benchmark profile"}\n` : ""}• Subject Identification: ${caseData.subjectNameOrIdentifier || "Unidentified Doe"}
+• Estimated Age / Sex:    ${caseData.ageYears ? `${caseData.ageYears} years` : "Unspecified"} / ${(caseData.sex || "Unknown").toUpperCase()}
+• Attending Examiner:     ${caseData.investigatorName || caseData.examinerName || "Staff Medical Examiner"}
+• Jurisdiction / Agency:  ${caseData.jurisdiction || "Forensic Pathology Division"}
 • Scene Location:         ${caseData.locationDescription || "Scene"}
 • Discovery Timestamp:    ${caseData.discoveryTimestamp || "Unrecorded"}
 • Integrity Security Hash: ${integrityHash}
@@ -79,15 +123,22 @@ CASE RECORD & DEMOGRAPHICS:
 SCENE ENVIRONMENTAL BASELINE:
 • Ambient Scene Temp:     ${caseData.ambientTempC} °C
 • Body Mass / Weight:     ${caseData.bodyWeightKg} kg
-• Body Discovery Posture: ${caseData.bodyFoundPosition.toUpperCase()}
+• Body Discovery Posture: ${(caseData.bodyFoundPosition || "Supine").toUpperCase()}
 
 --------------------------------------------------------------------------------
 COMPOSITE POST-MORTEM INTERVAL (PMI) ESTIMATION:
 • Estimated PMI Range:    ${result.estimatedPmiMinHours} – ${result.estimatedPmiMaxHours} Hours (~${(result.estimatedPmiMinHours / 24).toFixed(1)} to ${(result.estimatedPmiMaxHours / 24).toFixed(1)} days)
 • Point Optimum PMI:      ${result.estimatedPmiOptimalHours} Hours (~${(result.estimatedPmiOptimalHours / 24).toFixed(1)} days)
-• Estimated TOD Window:   ${result.estimatedTimeOfDeathMin} to ${result.estimatedTimeOfDeathMax}
+• Estimated TOD Window:   ${result.estimatedTimeOfDeathOptimal || result.estimatedTimeOfDeathMin || "Calculated Window"}
 • Model Harmony / Score:  ${result.confidenceScore}% (${result.confidenceTier})
 • Dominant Anchors:       ${result.dominantIndicatorSummary.join(", ")}
+
+XGBOOST 100-TREE REGRESSION & TREESHAP EXPLAINABILITY:
+• XGBoost ML Prediction:  ${mlPredictionData.estimatedPmiOptimalHours} Hours (~${(mlPredictionData.estimatedPmiOptimalHours / 24).toFixed(1)} days)
+• Prediction Interval:    ${mlPredictionData.estimatedPmiMinHours} – ${mlPredictionData.estimatedPmiMaxHours} Hours (95% Empirical CI)
+• TreeSHAP Base E[y]:     ${mlPredictionData.baseValueHours} Hours (Calculated in ${inBrowserExecTimeMs}ms)
+• Top Feature Attributions:
+${mlPredictionData.factorAttributions?.slice(0, 4).map(attr => `  - ${attr.factorName}: ${attr.impactDirection === 'increases_pmi' ? '+' : '-'}${attr.pullMagnitudeHours}h (${attr.explanation})`).join('\n') || "  - Standard vector baseline"}
 
 --------------------------------------------------------------------------------
 FORENSIC INDICATOR MODULE EVALUATION & INPUTS:
@@ -264,25 +315,10 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
     setTimeout(() => setDownloadSuccess(null), 3000);
   };
 
-  const handleDownloadPdf = async () => {
-    setDownloadSuccess("Generating PDF Document...");
-    const success = await exportForensicCaseReportPdf(caseData, result, visionData, integrityHash);
-    if (success) {
-      setDownloadSuccess("PDF Report Downloaded");
-    } else {
-      setDownloadSuccess("HTML Fallback Report Downloaded");
-    }
-    setTimeout(() => setDownloadSuccess(null), 3500);
-  };
-
   const handlePrint = () => {
-    setDownloadSuccess("Invoking Print & Generating PDF...");
-    setTimeout(() => setDownloadSuccess(null), 3000);
-    try {
-      printForensicCaseReport(caseData, result, visionData, integrityHash);
-    } catch {
-      window.print();
-    }
+    setDownloadSuccess("PDF & Print Dossier Downloaded!");
+    setTimeout(() => setDownloadSuccess(null), 3500);
+    printForensicCaseReport(caseData, result, visionData, integrityHash);
   };
 
   return (
@@ -324,6 +360,68 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto no-print">
+          {/* Download Visual Analytics Quick Menu */}
+          <div className="flex items-center gap-1 p-1 bg-slate-950/90 border border-slate-800 rounded-xl">
+            <button
+              type="button"
+              onClick={async () => {
+                setDownloadSuccess("Downloading Henssge Cooling Curve PNG...");
+                const svg = generateHenssgeCoolingSvg(result, caseData);
+                await downloadSvgAsPng(svg, `Henssge-CoolingCurve-${caseData.caseId || "CASE"}.png`);
+                setTimeout(() => setDownloadSuccess(null), 3000);
+              }}
+              title="Download Henssge Cooling Trajectory Chart (PNG)"
+              className="px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-teal-400 text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <LineChart className="w-3.5 h-3.5" />
+              <span>Cooling Curve</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                setDownloadSuccess("Downloading PMI Probability Density PNG...");
+                const svg = generatePmiDistributionSvg(result, caseData);
+                await downloadSvgAsPng(svg, `PMI-ProbabilityDensity-${caseData.caseId || "CASE"}.png`);
+                setTimeout(() => setDownloadSuccess(null), 3000);
+              }}
+              title="Download PMI Probability Density Distribution (PNG)"
+              className="px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-sky-400 text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>PMI Density</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                setDownloadSuccess("Downloading Factor Attribution & SHAP PNG...");
+                const svg = generateFactorAttributionSvg(result, mlPredictionData, caseData);
+                await downloadSvgAsPng(svg, `FactorAttribution-TreeSHAP-${caseData.caseId || "CASE"}.png`);
+                setTimeout(() => setDownloadSuccess(null), 3000);
+              }}
+              title="Download Factor Attribution & TreeSHAP Waterfall (PNG)"
+              className="px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-amber-400 text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Attribution</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                setDownloadSuccess("Generating Complete Visual & Data Bundle...");
+                await downloadAllVisualizationsBundle(result, mlPredictionData, caseData);
+                setTimeout(() => setDownloadSuccess(null), 3500);
+              }}
+              title="Download Complete Analytical Bundle (All 3 Charts + JSON dossier)"
+              className="px-2 py-1.5 rounded-lg bg-teal-950/80 hover:bg-teal-900/80 text-teal-300 border border-teal-800/80 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>All Exhibits</span>
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={handleCopyText}
@@ -355,7 +453,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
             type="button"
             onClick={handleDownloadHtml}
             className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-teal-900/60"
-            title="Download standalone print-ready HTML case report"
+            title="Download standalone print-ready HTML case report with embedded charts"
           >
             <Download className="w-4 h-4" />
             <span>.HTML</span>
@@ -363,22 +461,12 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
 
           <button
             type="button"
-            onClick={handleDownloadPdf}
-            className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-rose-900/60"
-            title="Download direct PDF file"
-          >
-            <Download className="w-4 h-4" />
-            <span>.PDF</span>
-          </button>
-
-          <button
-            type="button"
             onClick={handlePrint}
-            className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-teal-900/30 cursor-pointer"
-            title="Invoke browser Print & save as PDF dialog"
+            className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-teal-900/40 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+            title="Print or Save as PDF via native print dialog"
           >
             <Printer className="w-4 h-4" />
-            <span>Print / Save PDF</span>
+            <span>Print Report</span>
           </button>
         </div>
       </div>
@@ -390,38 +478,183 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
         </div>
       )}
 
-      {/* Official Report Document Body */}
-      <div id="official-case-report-content" className="bg-slate-950 rounded-2xl border border-slate-800 p-6 sm:p-8 space-y-8 text-slate-200">
-        {/* Report Header / Brand */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 border-b border-slate-800 pb-6">
-          <div className="flex items-center gap-4">
-            <RecreatedLogo className="w-14 h-14 shrink-0" showSubtitle={false} />
+      {/* Real-Time Automated Execution & Engine Telemetry Status Bar */}
+      <div className="rounded-2xl bg-gradient-to-r from-teal-950/90 via-slate-900 to-slate-900 border border-teal-500/40 p-4 space-y-3 no-print shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-300 shrink-0">
+              <Zap className="w-5 h-5 text-teal-400" />
+            </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-black text-slate-100 tracking-tight">VISIONMORTIS</span>
-                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-teal-950 text-teal-300 border border-teal-800">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-slate-100 uppercase tracking-wide">
+                  Automated Synthesis Engine
+                </span>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-700/80 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Real-Time Active ({inBrowserExecTimeMs}ms)
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Automatically executes the multimodal fusion engine, 100-tree in-browser XGBoost regressor, 212-feature TreeSHAP explainability, and AI pathologist synthesis.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {onRunAiSynthesis && (
+              <button
+                type="button"
+                onClick={onRunAiSynthesis}
+                disabled={isAiLoading}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                title="Run or Refresh Deep AI Pathologist Synthesis"
+              >
+                {isAiLoading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Synthesizing AI...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{result.aiSynthesis ? "Re-Run AI Synthesis" : "Run AI Synthesis"}</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowFullSynthesisPanel(!showFullSynthesisPanel)}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium border border-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
+            >
+              <span>{showFullSynthesisPanel ? "Hide Synthesis Hub" : "Show Synthesis Hub"}</span>
+              {showFullSynthesisPanel ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Telemetry Micro-Badges */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-slate-800/80 text-[11px]">
+          <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-800 flex items-center justify-between">
+            <span className="text-slate-400">Fusion Engine:</span>
+            <span className="font-mono text-teal-300 font-semibold">{result.confidenceScore}% Harmony</span>
+          </div>
+          <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-800 flex items-center justify-between">
+            <span className="text-slate-400">XGBoost ML:</span>
+            <span className="font-mono text-emerald-400 font-semibold">{mlPredictionData.estimatedPmiOptimalHours}h</span>
+          </div>
+          <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-800 flex items-center justify-between">
+            <span className="text-slate-400">TreeSHAP:</span>
+            <span className="font-mono text-amber-300 font-semibold">212 Features</span>
+          </div>
+          <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-800 flex items-center justify-between">
+            <span className="text-slate-400">AI Pathologist:</span>
+            <span className="font-mono text-teal-300 font-semibold">{isAiLoading ? "Synthesizing..." : result.aiSynthesis ? "Synchronized" : "Ready"}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Embedded Comprehensive Final Synthesis & Explainability Hub */}
+      {showFullSynthesisPanel && (
+        <div className="space-y-3 no-print">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-teal-400">
+                Final Synthesis & Explainability Hub
+              </h3>
+            </div>
+            <a
+              href="#official-case-report-content"
+              className="text-xs text-slate-400 hover:text-teal-300 font-medium flex items-center gap-1 cursor-pointer"
+            >
+              <span>Scroll to Official Report Body ↓</span>
+            </a>
+          </div>
+
+          <PmiOutputPanel
+            result={result}
+            caseData={caseData}
+            onRunAiSynthesis={onRunAiSynthesis || (() => {})}
+            isAiLoading={isAiLoading}
+            onOpenReportModal={() => {
+              const el = document.getElementById("official-case-report-content");
+              el?.scrollIntoView({ behavior: "smooth" });
+            }}
+          />
+        </div>
+      )}
+
+      {/* Official Report Document Body */}
+      <div id="official-case-report-content" className="bg-slate-950 rounded-2xl border border-slate-800 p-4 sm:p-8 space-y-8 text-slate-200 overflow-hidden">
+        {/* Report Header / Brand */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5 border-b border-slate-800 pb-6">
+          <div className="flex items-start sm:items-center gap-3 sm:gap-4 w-full md:w-auto min-w-0">
+            <RecreatedLogo className="w-11 h-11 sm:w-14 sm:h-14 shrink-0" showSubtitle={false} />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                <span className="text-lg sm:text-xl font-black text-slate-100 tracking-tight">VISIONMORTIS</span>
+                <span className="inline-flex items-center text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-teal-950/90 text-teal-300 border border-teal-800/80 whitespace-nowrap shrink-0">
                   PROTOCOL ONE
                 </span>
               </div>
-              <p className="text-xs font-semibold text-slate-400 tracking-wide uppercase">
+              <p className="text-[11px] sm:text-xs font-semibold text-slate-400 tracking-wide uppercase mt-1 break-words">
                 Post-Mortem Interval Multimodal Forensic Case Report
               </p>
-              <div className="text-[11px] text-[#D4AF37] font-medium mt-0.5">
+              <div className="text-[10px] sm:text-[11px] text-[#D4AF37] font-medium mt-0.5">
                 Research Prototype System
               </div>
             </div>
           </div>
 
-          <div className="text-right space-y-1 text-xs">
+          <div className="w-full md:w-auto text-left md:text-right space-y-1 text-xs pt-3 md:pt-0 border-t md:border-t-0 border-slate-800/60 shrink-0">
             <div className="font-mono text-slate-400">
               Generated: <span className="text-slate-200">{new Date().toLocaleString()}</span>
             </div>
-            <div className="font-mono text-[11px] text-slate-500 flex items-center justify-end gap-1">
-              <Lock className="w-3 h-3 text-teal-400" />
+            <div className="font-mono text-[11px] text-slate-500 flex items-center md:justify-end gap-1 flex-wrap break-all">
+              <Lock className="w-3 h-3 text-teal-400 shrink-0" />
               <span>SHA-256: {integrityHash}</span>
             </div>
           </div>
         </div>
+
+        {/* Preset Benchmark Case Banner (if preset used) */}
+        {(caseData.presetName || caseData.isPresetCase) && (
+          <div className="p-4 rounded-xl bg-teal-950/40 border border-teal-500/40 flex items-start gap-3.5 text-xs animate-in fade-in duration-150">
+            <div className="w-8 h-8 rounded-lg bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-300 shrink-0 mt-0.5">
+              <FileSpreadsheet className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-bold text-teal-300 uppercase tracking-wider">
+                  Preset Reference Case Profile:
+                </span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-teal-900/80 text-teal-200 border border-teal-700/80">
+                  {caseData.presetCategory || "Benchmark Case"}
+                </span>
+                {caseData.isHarmonicPreset ? (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
+                    ✓ Harmonic Baseline (0 Discordance)
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">
+                    Specialized Profile
+                  </span>
+                )}
+              </div>
+              <div className="font-bold text-slate-100 text-sm mt-0.5">
+                {caseData.presetName || caseData.subjectNameOrIdentifier}
+              </div>
+              {caseData.presetDescription && (
+                <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                  {caseData.presetDescription}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* 1. Case Identification & Demographics Summary */}
         <div className="space-y-3">
@@ -430,17 +663,22 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
             <span>1. Case Demographics & Scene Baseline</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800">
               <div className="text-[11px] text-slate-500">Case / File Number</div>
               <div className="font-mono font-bold text-sm text-slate-100 mt-0.5">
                 {caseData.caseId || "Not Assigned"}
               </div>
-              {caseValidation.isValid ? (
-                <div className="text-[10px] text-teal-400 font-mono mt-1">✓ Validated Format</div>
-              ) : (
-                <div className="text-[10px] text-amber-400 font-mono mt-1">⚠ {caseValidation.error || "Format Warning"}</div>
-              )}
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-teal-900/40 bg-gradient-to-b from-slate-900 to-teal-950/20">
+              <div className="text-[11px] text-teal-400 font-medium">Attending Pathologist / Examiner</div>
+              <div className="font-bold text-sm text-teal-200 mt-0.5 truncate" title={caseData.investigatorName || caseData.examinerName || "Staff Medical Examiner"}>
+                {caseData.investigatorName || caseData.examinerName || "Staff Medical Examiner"}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-1 truncate">
+                {caseData.jurisdiction || "Division of Forensic Medicine"}
+              </div>
             </div>
 
             <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800">
@@ -528,6 +766,84 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
               <span className="text-teal-400">{result.dominantIndicatorSummary.join(" • ")}</span>
             </div>
           )}
+
+          {/* XGBoost 100-Tree Model & TreeSHAP Section Callout */}
+          <div className="mt-3 p-4 rounded-xl bg-slate-950/90 border border-emerald-800/60 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-bold text-emerald-300 uppercase tracking-wide">
+                  XGBoost Ensemble & TreeSHAP Attribution (212 Features)
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-slate-400">
+                Evaluation Latency: <strong className="text-emerald-400">{inBrowserExecTimeMs}ms</strong>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
+                <div className="text-[10px] text-slate-400">XGBoost Optimum</div>
+                <div className="text-base font-bold font-mono text-emerald-300 mt-0.5">
+                  {mlPredictionData.estimatedPmiOptimalHours} <span className="text-xs font-normal text-slate-400">hours</span>
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">
+                  ~{(mlPredictionData.estimatedPmiOptimalHours / 24).toFixed(1)} days
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
+                <div className="text-[10px] text-slate-400">95% Empirical Bracket</div>
+                <div className="text-sm font-bold font-mono text-slate-200 mt-0.5">
+                  {mlPredictionData.estimatedPmiMinHours} – {mlPredictionData.estimatedPmiMaxHours} <span className="text-xs font-normal text-slate-400">hours</span>
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">
+                  Empirical quantile bounds
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
+                <div className="text-[10px] text-slate-400">TreeSHAP Base E[y]</div>
+                <div className="text-sm font-bold font-mono text-amber-300 mt-0.5">
+                  {mlPredictionData.baseValueHours} <span className="text-xs font-normal text-slate-400">hours</span>
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">
+                  Prior population center
+                </div>
+              </div>
+            </div>
+
+            {mlPredictionData.factorAttributions && mlPredictionData.factorAttributions.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <div className="text-[11px] font-semibold text-slate-300 flex items-center justify-between">
+                  <span>Top TreeSHAP Feature Attributions:</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Ranked by absolute pull</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {mlPredictionData.factorAttributions.slice(0, 4).map((attr, idx) => (
+                    <div
+                      key={idx}
+                      className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/80 flex items-center justify-between gap-2 text-[11px]"
+                    >
+                      <div className="truncate">
+                        <span className="font-medium text-slate-200 truncate">{attr.factorName}</span>
+                        <div className="text-[10px] text-slate-400 truncate">{attr.explanation}</div>
+                      </div>
+                      <span
+                        className={`px-1.5 py-0.5 rounded font-mono font-bold text-[10px] shrink-0 ${
+                          attr.impactDirection === "increases_pmi"
+                            ? "bg-amber-950 text-amber-300 border border-amber-800"
+                            : "bg-teal-950 text-teal-300 border border-teal-800"
+                        }`}
+                      >
+                        {attr.impactDirection === "increases_pmi" ? "+" : "-"}{attr.pullMagnitudeHours}h
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 3. Detailed Forensic Module Inputs & Calculated Values */}

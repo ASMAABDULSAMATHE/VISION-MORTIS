@@ -314,6 +314,7 @@ export interface ForensicPresetCase {
   category: "Early (0-24h)" | "Intermediate (1-3 days)" | "Advanced (4-14 days)" | "Environmental Anomaly" | "Conflicting Evidence";
   description: string;
   sceneSummary: string;
+  isHarmonic?: boolean;
   metadata: CaseMetadata;
   algor: AlgorMortisData;
   livor: LivorMortisData;
@@ -326,11 +327,19 @@ export interface ForensicPresetCase {
 export interface ForensicCaseInput {
   caseId: string;
   subjectNameOrIdentifier: string;
+  presetId?: string;
+  presetName?: string;
+  presetCategory?: string;
+  presetDescription?: string;
+  isPresetCase?: boolean;
+  isHarmonicPreset?: boolean;
   ageYears?: number;
   sex: "male" | "female" | "unknown";
   discoveryTimestamp: string;
   locationDescription: string;
   investigatorName: string;
+  examinerName?: string;
+  jurisdiction?: string;
   ambientTempC: number;
   bodyWeightKg: number;
   bodyFoundPosition: BodyPosition;
