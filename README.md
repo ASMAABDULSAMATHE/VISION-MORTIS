@@ -58,7 +58,7 @@ The model is evaluated using held-out synthetic data. These results demonstrate 
 
 The trained XGBoost model used in this prototype is included in this repository:
 
-- **Location:** `XGBoost_SHAP/model.py`(XGBoost_SHAP/Model.py)
+- **Location:** [`XGBoost_SHAP/model.py`](XGBoost_SHAP/Model.py)
 - **Input:** Seven forensic indicators 
   1. Livor mortis
   2. Decomposition stage
@@ -73,7 +73,7 @@ The trained XGBoost model used in this prototype is included in this repository:
 
 The SHAP analysis shows which indicators drove each PMI prediction and by how much, allowing examiners to identify which evidence to review more closely.
 
-- **Location:** `XGBoost_SHAP/shap.py`(XGBoost_SHAP/shap.py)
+- **Location:** [`XGBoost_SHAP/shap.py`](XGBoost_SHAP/shap.py)
 <p align="center">
   <img width="805" height="940" alt="SHAP feature importance summary plot" src="https://github.com/user-attachments/assets/647fa1c4-354d-49aa-b117-64960e6a54c3" /><br>
   <em>Figure: SHAP Feature Importance Summary</em>
