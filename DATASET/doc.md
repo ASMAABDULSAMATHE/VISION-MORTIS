@@ -113,7 +113,7 @@ Every CV-derived field is a **separate column** from its manual-observation coun
 
 ## 5. Data Dictionary
 
-Full variable-level reference for the 72-column Master Multimodal Data table. All variables are synthetic (literature/data-informed); none constitute validated forensic ground truth.
+Variable-level reference for the 72-column Master Multimodal Data table. All variables are synthetic (literature/data-informed); none constitute validated forensic ground truth.
 
 > Every variable's `real_or_synthetic` value is `synthetic` — omitted below as a repeated column.
 
