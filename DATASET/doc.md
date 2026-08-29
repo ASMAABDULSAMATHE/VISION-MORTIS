@@ -1,5 +1,5 @@
-# VisionMortis — Protocol One
-## Master Multimodal Dataset — Reference Documentation
+# VisionMortis - Protocol One
+## Master Multimodal Dataset - Reference Documentation
 
 > Case-level records are provided separately as [`visionmortis_master_multimodal.csv`](visionmortis_master_multimodal.csv).
 
@@ -94,9 +94,6 @@ Every CV-derived field is a **separate column** from its manual-observation coun
 
 | Metric Description | Validation Value / Status |
 |---|---|
-| Total Cases Generated | 500 |
-| Total Features in Master CSV | 72 |
-| Total Columns in ML-Ready CSV | 112 |
 | PMI Minimum (hours) | 0.70 |
 | PMI Maximum (hours) | 1179.79 |
 | PMI Median (hours) | 76.24 |
@@ -104,9 +101,7 @@ Every CV-derived field is a **separate column** from its manual-observation coun
 | Relative Humidity Mean (%) | 61.56 |
 | Body Mass Mean (kg) | 74.12 |
 | Incomplete / Missing Modality Cases | 198 |
-| Incomplete Cases Percentage (%) | 39.60% |
 | Conflicting Synthetic Cases | 55 |
-| Conflicting Cases Percentage (%) | 11.00% |
 | Metabolomics Fully Available Cases | 441 |
 | Metabolomics Fully Available Percentage (%) | 88.20% |
 | Computer Vision Observations Available (%) | 90.40% |
