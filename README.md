@@ -66,7 +66,7 @@ The trained XGBoost model used in this prototype is included in this repository:
   8. Body movement
   9. Scene photographs
 
-- **Output:** PMI point estimate with confidence interval
+- **Output:** PMI point estimate with confidence interval, inconsistency alert and contributing factors
 
 ### SHAP Analysis
 
