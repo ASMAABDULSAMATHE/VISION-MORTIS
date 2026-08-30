@@ -4,8 +4,6 @@
 
 VisionMortis is a research prototype designed to support **post-mortem interval (PMI) estimation** by integrating multiple biological, environmental, visual, entomological, and metabolomic evidence streams.
 
-> **Research Prototype:** VisionMortis is intended for research and educational purposes and does not replace professional forensic examination or expert judgment.
-
 ---
 
 ## Overview
