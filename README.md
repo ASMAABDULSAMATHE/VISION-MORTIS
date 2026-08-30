@@ -4,8 +4,6 @@
 
 VisionMortis is a research prototype designed to support **post-mortem interval (PMI) estimation** by integrating multiple biological, environmental, visual, entomological, and metabolomic evidence streams.
 
----
-
 ## Overview
 
 Estimating the time since death is challenging because post-mortem changes are influenced by multiple biological and environmental factors. Individual indicators may provide useful information at different stages and may sometimes produce conflicting estimates.
