@@ -170,18 +170,68 @@ export type ImageAnatomicalTag =
 export interface VisionImageItem {
   id: string;
   dataUrl: string;
+  previewUrl?: string;
   name: string;
   tag?: ImageAnatomicalTag;
   uploadedAt?: string;
   detectedFindings?: string;
   isUnrelated?: boolean;
+  unrelatedIssueType?: "handwritten_document" | "live_person" | "unrelated_object_scene" | "other_non_forensic";
+  unrelatedIssueDescription?: string;
   relevanceCategory?: RelevanceCategoryType;
   relevanceStatus?: "Forensic Biological Evidence" | "Unrelated / Non-Forensic" | "Scene Context";
   warningMessage?: string;
   categoryLabel?: string;
   qualityRating?: "Optimal" | "Suboptimal / Glare / Low Contrast" | "Blurry / Degraded";
   qualityNote?: string;
+  qualityWarning?: string | null;
+  // Deep Clarity & Reliability Metrics
+  clarityScore?: number; // 0 - 100
+  clarityRating?: "Optimal (Sharp & Well-Lit)" | "Moderate (Mild Blur/Soft Focus)" | "Suboptimal (Low Light / Blur)" | "Poor (Degraded / Motion Blur)";
+  clarityIssues?: string[];
+  clarityDetails?: string;
+  reliabilityScore?: number; // 0 - 100
+  reliabilityRating?: "Forensic-Grade (High Confidence)" | "Moderate Confidence" | "Low / Questionable";
+  reliabilityFactors?: string[];
+  reliabilityDetails?: string;
+  forensicRecommendations?: string;
   pmiImplication?: string;
+  detectedMovementIndicators?: {
+    movementSuspected: boolean;
+    pattern?: string;
+    details?: string;
+    confidenceScore?: number;
+  };
+}
+
+export interface DetectedBodyMovement {
+  suspectedMovement: boolean;
+  confidenceScore: number; // 0 - 100% confidence for XGBoost cv_movement_confidence
+  movementPattern:
+    | "none_consistent"
+    | "dual_discordant_lividity"
+    | "shifted_pressure_blanching"
+    | "gravitational_discordance"
+    | "drag_marks_abrasions"
+    | "clothing_posture_discordance";
+  patternLabel: string;
+  description: string;
+  forensicIndicators: string[];
+  pmiImpactAssessment: string;
+  incongruentSurfaces?: string;
+  estimatedMovementWindowHours?: {
+    min: number;
+    max: number;
+  };
+}
+
+export interface UnrelatedImageIssue {
+  imageId: string;
+  imageName: string;
+  issueType: "handwritten_document" | "live_person" | "unrelated_object_scene" | "other_non_forensic";
+  issueTitle: string;
+  issueMessage: string;
+  recommendation: string;
 }
 
 export interface VisionDetectionData {
@@ -212,8 +262,19 @@ export interface VisionDetectionData {
     tacheNoirePresent: boolean;
     description: string;
   };
+  detectedMovement?: DetectedBodyMovement;
   unrelatedImagesDetected?: boolean;
   unrelatedImageCount?: number;
+  unrelatedIssuesList?: UnrelatedImageIssue[];
+  averageClarityScore?: number;
+  averageReliabilityScore?: number;
+  overallQualityAssessment?: string;
+  clarityReliabilitySummary?: {
+    optimalCount: number;
+    suboptimalCount: number;
+    overallReliabilityTier: "Forensic-Grade Evidence" | "Moderate Reliability" | "Caution: Low Quality / Blur";
+    detailedRecommendations: string[];
+  };
   detectedCategoryBreakdown?: {
     documentsAndWritings: number;
     livingPeople: number;
@@ -227,19 +288,34 @@ export interface VisionDetectionData {
     confidence: number;
   };
   forensicObservations?: string;
+  examinerNotes?: string;
+  investigatorNotes?: string;
   qualityWarning?: string | null;
   perImageFindings?: Array<{
     imageId: string;
     tag: string;
     isUnrelated?: boolean;
+    unrelatedIssueType?: string;
+    unrelatedIssueDescription?: string;
     relevanceCategory?: "writing_or_document" | "live_human" | "unrelated_object" | "deceased_human_forensic";
     relevanceStatus?: string;
     categoryLabel?: string;
     warningMessage?: string;
     qualityRating?: string;
     qualityNote?: string;
+    clarityScore?: number;
+    clarityRating?: string;
+    clarityIssues?: string[];
+    clarityDetails?: string;
+    reliabilityScore?: number;
+    reliabilityRating?: string;
+    reliabilityFactors?: string[];
+    reliabilityDetails?: string;
+    forensicRecommendations?: string;
     findings: string;
     pmiImplication?: string;
+    movementSuspected?: boolean;
+    movementDetails?: string;
   }>;
 }
 

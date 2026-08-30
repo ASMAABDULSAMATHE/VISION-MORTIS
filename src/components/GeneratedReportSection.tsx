@@ -1025,18 +1025,18 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                 >
                   <div className="relative rounded-lg overflow-hidden bg-slate-950 aspect-video flex items-center justify-center border border-slate-800">
                     <img
-                      src={img.previewUrl}
+                      src={img.dataUrl || img.previewUrl}
                       alt={img.name || `Forensic Evidence ${idx + 1}`}
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
                     />
-                    <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                    <div className="absolute top-2 left-2 flex items-center gap-1.5 flex-wrap">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-950/90 text-slate-200 border border-slate-700">
                         Photo {idx + 1}
                       </span>
                       {img.isUnrelated ? (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" /> Unrelated
+                          <AlertTriangle className="w-3 h-3" /> Excluded Issue
                         </span>
                       ) : (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-teal-950 text-teal-300 border border-teal-800">
@@ -1045,11 +1045,15 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                       )}
                     </div>
 
-                    {img.qualityRating && (
+                    {!img.isUnrelated && (img.clarityScore !== undefined || img.reliabilityScore !== undefined) ? (
+                      <div className="absolute bottom-2 right-2 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-950/90 text-teal-300 border border-teal-800/60">
+                        Clarity: {img.clarityScore ?? 92}% | Reliability: {img.reliabilityScore ?? 90}%
+                      </div>
+                    ) : img.qualityRating ? (
                       <div className="absolute bottom-2 right-2 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-950/90 text-slate-300 border border-slate-800">
                         Quality: {img.qualityRating}
                       </div>
-                    )}
+                    ) : null}
                   </div>
 
                   <div className="space-y-1 text-xs">

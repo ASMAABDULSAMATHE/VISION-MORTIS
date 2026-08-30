@@ -438,18 +438,22 @@ export function extractXgbFeatureVector(caseData: CaseDataInput): {
 
   setContinuousFeature("metabolomics_available", metab.enabled ? 1 : 0, 0);
   setContinuousFeature("metabolomics_missing_feature_count", metab.enabled ? 2 : 11, 4);
-  setContinuousFeature("movement_confidence", livor.suspectedBodyMovement ? 85.0 : 0, 0);
+
+  const cvImages = (vision.images || []).filter((img) => !img.isUnrelated);
+  const cvAvailable = cvImages.length > 0 && !vision.unrelatedImagesDetected;
+
+  const isMovementSuspected = !!(livor.suspectedBodyMovement || (cvAvailable && cvImages.length >= 2 && vision.detectedMovement?.suspectedMovement));
+  const movementConfVal = isMovementSuspected ? (vision.detectedMovement?.confidenceScore ?? 85.0) : 0;
+  setContinuousFeature("movement_confidence", movementConfVal, 0);
 
   // Computer Vision features
-  const cvImages = vision.images || [];
-  const cvAvailable = cvImages.length > 0;
   setContinuousFeature("cv_available", cvAvailable ? 1 : 0, 0);
   setContinuousFeature("cv_image_count", cvImages.length, 0);
   setContinuousFeature("cv_decomposition_confidence", cvAvailable ? 85.0 : 0, 0);
   setContinuousFeature("cv_livor_confidence", cvAvailable ? 80.0 : 0, 0);
-  setContinuousFeature("cv_entomology_present", vision.detectedEntomology?.insectsPresent ? 1 : 0, 0);
-  setContinuousFeature("cv_entomology_confidence", vision.detectedEntomology?.insectsPresent ? 85.0 : 0, 0);
-  setContinuousFeature("cv_movement_confidence", 0, 0);
+  setContinuousFeature("cv_entomology_present", cvAvailable && vision.detectedEntomology?.insectsPresent ? 1 : 0, 0);
+  setContinuousFeature("cv_entomology_confidence", cvAvailable && vision.detectedEntomology?.insectsPresent ? 85.0 : 0, 0);
+  setContinuousFeature("cv_movement_confidence", cvAvailable && cvImages.length >= 2 && vision.detectedMovement?.suspectedMovement ? (vision.detectedMovement.confidenceScore ?? 85.0) : 0, 0);
 
   // Ordinal Features
   const setOrdinal = (name: string, val: number, missing: boolean) => {
@@ -503,9 +507,20 @@ export function extractXgbFeatureVector(caseData: CaseDataInput): {
   setOrdinal("cv_entomology_stage", insectOrd, !cvAvailable);
 
   // Movement position change ordinal
-  const movementOrd = livor.suspectedBodyMovement ? 2 : 0;
+  const movementOrd = isMovementSuspected ? 2 : 0;
   setOrdinal("body_movement_position_change", movementOrd, false);
-  setOrdinal("cv_movement_position_change", movementOrd, false);
+
+  let cvMovementOrd = 0;
+  if (cvAvailable && cvImages.length >= 2 && vision.detectedMovement?.suspectedMovement) {
+    if (vision.detectedMovement.movementPattern === "dual_discordant_lividity" || vision.detectedMovement.movementPattern === "gravitational_discordance") {
+      cvMovementOrd = 2;
+    } else {
+      cvMovementOrd = 1;
+    }
+  } else if (livor.suspectedBodyMovement) {
+    cvMovementOrd = 2;
+  }
+  setOrdinal("cv_movement_position_change", cvMovementOrd, !cvAvailable);
 
   // Clothing One-Hot
   const clothFactor = algor.clothingCoveringFactor ?? 1.0;
@@ -818,6 +833,15 @@ function getHumanReadableAttribution(
       factorName: "Micro-Environmental Deposition Site",
       category: "Environment",
       explanation: "Scene substrate and burial depth dictate microbiological growth rate.",
+    };
+  }
+  if (featureKey.includes("movement") || featureKey.includes("position_change")) {
+    return {
+      factorName: "Post-Mortem Body Movement / Relocation",
+      category: "Vision",
+      explanation: shapVal > 0
+        ? "Dual lividity / post-mortem position shift indicates body was moved after initial hypostasis formation (anchoring PMI beyond the 2–8h fixation threshold)."
+        : "Gravitational lividity and body position consistency confirms undisturbed post-mortem posture.",
     };
   }
   if (featureKey.includes("cv_")) {

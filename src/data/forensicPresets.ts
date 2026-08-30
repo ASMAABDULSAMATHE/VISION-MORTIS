@@ -5,7 +5,7 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
     id: "preset-early-harmonic",
     title: "Normal Fresh Scene - Algor & Livor Dominant (~4–6h) [Harmonic]",
     category: "Early (0-24h)",
-    description: "Standard indoor discovery with consistent core cooling, blanching posterior hypostasis, and early jaw rigor. Zero discordance.",
+    description: "Standard indoor discovery with consistent core cooling, blanching posterior hypostasis, early jaw rigor, and vitreous [K+]. Output PMI window: 2–7 hours.",
     sceneSummary: "Individual discovered in heated apartment bedroom. Last confirmed call 5 hours prior. Ambient temp 21.0°C. Fully consistent early markers.",
     isHarmonic: true,
     metadata: {
@@ -21,11 +21,11 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
       bodyFoundPosition: "supine",
       bodyWeightKg: 74,
       notes: "No signs of forced entry. Subject clothed in light cotton pajamas on mattress.",
-      examinersNotes: "External examination reveals marked corneal clarity with absence of Sommer-Larcher line. Hypostasis is pinkish-purple, distributed along dependent posterior regions, and blanches completely upon thumb pressure over scapulae and gluteal contact margins. Temporal cooling plateau active with rectal core measuring 34.4°C at 21.0°C ambient. Nysten's progression limited to temporomandibular and cervical joints. Vitreous [K+] is 4.8 mmol/L. All physiological indicators exhibit 100% harmonic alignment.",
+      examinersNotes: "External examination reveals marked corneal clarity with absence of Sommer-Larcher line. Hypostasis is pinkish-purple, distributed along dependent posterior regions, and blanches completely upon thumb pressure over scapulae and gluteal contact margins. Temporal cooling plateau active with rectal core measuring 35.0°C at 21.0°C ambient. Nysten's progression limited to temporomandibular and cervical joints. Vitreous [K+] is 5.0 mmol/L. All physiological indicators exhibit 100% harmonic alignment within the 4–6 hour post-mortem window.",
     },
     algor: {
       enabled: true,
-      rectalTempC: 34.4,
+      rectalTempC: 35.0,
       ambientTempC: 21.0,
       bodyWeightKg: 74,
       clothingCoveringFactor: 1.1,
@@ -56,7 +56,7 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
       coldStiffeningSuspected: false,
     },
     decomposition: {
-      enabled: true,
+      enabled: false,
       headNeckScore: 1,
       trunkScore: 1,
       limbsScore: 1,
@@ -70,7 +70,7 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
       effectiveMeanTempC: 21.0,
     },
     entomology: {
-      enabled: true,
+      enabled: false,
       primaryInsectGroup: "none",
       developmentalStage: "none",
       larvalLengthMm: 0,
@@ -79,17 +79,17 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
     },
     metabolomics: {
       enabled: true,
-      vitreousPotassiumMmolL: 4.8,
+      vitreousPotassiumMmolL: 5.0,
       vitreousHypoxanthineUmolL: 28,
       suspectedRenalFailureOrTrauma: false,
     },
   },
   {
     id: "preset-intermediate-harmonic",
-    title: "Normal Intermediate Scene - Complete Rigor & Fixed Livor (~28–32h) [Harmonic]",
+    title: "Normal Intermediate Scene - Complete Rigor & Fixed Livor (~28–36h) [Harmonic]",
     category: "Intermediate (1-3 days)",
-    description: "Standard room temperature discovery with complete generalized rigor, fixed posterior lividity, and early iliac greening. Zero discordance.",
-    sceneSummary: "Individual discovered in residential apartment. Ambient temp 20.0°C. Rectal core in thermal equilibrium with scene, fixed posterior hypostasis, generalized rigor.",
+    description: "Standard room temperature discovery with generalized rigor, fixed posterior hypostasis, 1st instar larvae, and matching metabolomics. Output PMI window: 24–50 hours (1–2 days).",
+    sceneSummary: "Individual discovered in residential apartment. Ambient temp 20.0°C. Core cooling nearing room baseline (22.8°C), fixed posterior hypostasis, generalized rigor.",
     isHarmonic: true,
     metadata: {
       caseNumber: "VM-2026-B412",
@@ -104,11 +104,11 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
       bodyFoundPosition: "supine",
       bodyWeightKg: 72,
       notes: "Quiet indoor setting. Ambient thermostat constant at 20.0°C.",
-      examinersNotes: "Decedent located in supine posture. Core rectal temperature has reached thermal equilibrium with ambient surroundings (20.8°C at 20.0°C ambient). Hypostasis is deep violaceous, fixed/unblanchable, and located symmetrically over dorsal dependent surfaces sparing contact pressure points (scapulae, gluteals, calves). Rigor mortis is complete and generalized across all major muscle groups. Early faint right lower quadrant abdominal greening observed (TBS 4/35). Vitreous potassium [K+] measures 7.2 mmol/L, corroborating a PMI of ~30 hours.",
+      examinersNotes: "Decedent located in supine posture. Core rectal temperature measures 22.8°C at 20.0°C ambient surroundings. Hypostasis is deep violaceous, fixed/unblanchable, and located symmetrically over dorsal dependent surfaces sparing contact pressure points (scapulae, gluteals, calves). Rigor mortis is complete and generalized across all major muscle groups. Early faint right lower quadrant abdominal greening observed (TBS 4/35). 1st instar larvae (2.2 mm) with estimated 6h access delay present at mucosal orifices. Vitreous potassium [K+] measures 9.4 mmol/L, corroborating a PMI of ~30–36 hours.",
     },
     algor: {
       enabled: true,
-      rectalTempC: 20.8,
+      rectalTempC: 22.8,
       ambientTempC: 20.0,
       bodyWeightKg: 72,
       clothingCoveringFactor: 1.0,
@@ -162,7 +162,7 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
     },
     metabolomics: {
       enabled: true,
-      vitreousPotassiumMmolL: 7.2,
+      vitreousPotassiumMmolL: 9.4,
       vitreousHypoxanthineUmolL: 46,
       suspectedRenalFailureOrTrauma: false,
     },
@@ -171,7 +171,7 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
     id: "preset-advanced-outdoor-harmonic",
     title: "Normal Advanced Outdoor - Active Decomp & Larval Feeding (~5–6 Days) [Harmonic]",
     category: "Advanced (4-14 days)",
-    description: "Woodland shaded scene with abdominal marbling, purge, and active 3rd instar feeding blowfly maggots. Zero discordance.",
+    description: "Woodland shaded scene with abdominal marbling, purge, and active 3rd instar feeding blowfly maggots. Output PMI window: 3–9 days (optimal ~5.2 days).",
     sceneSummary: "Subject located in wooded ravine under canopy shade. Ambient temperature averaged 22.5°C. Extensive feeding larval masses around neck and thoracic folds.",
     isHarmonic: true,
     metadata: {
@@ -187,7 +187,7 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
       bodyFoundPosition: "right_lateral",
       bodyWeightKg: 68,
       notes: "Remains shaded beneath forest canopy. Consistent active decay stage.",
-      examinersNotes: "Advanced active decay with extensive green-black discoloration, abdominal wall thinning with post-bloat collapse, and large active feeding maggot mass (3rd instar Calliphora vicina, mean length 13.5 mm) occupying cervical soft tissues. Larval mass generating elevated local temperature of 29.8°C (+7.3°C above ambient 22.5°C). Estimated ADD aligns cleanly with 5.0–6.0 days post-mortem. Algor and early rigor have naturally concluded.",
+      examinersNotes: "Advanced active decay with extensive green-black discoloration, abdominal wall thinning with post-bloat collapse, and large active feeding maggot mass (3rd instar Calliphora vicina, mean length 12.0 mm) occupying cervical soft tissues. Larval mass generating elevated local temperature of 29.8°C (+7.3°C above ambient 22.5°C). Estimated ADD aligns cleanly with 5.0–6.0 days post-mortem. Algor, livor, and rigor mortis have naturally concluded.",
     },
     algor: {
       enabled: false,
@@ -209,7 +209,7 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
       notes: "Obscured by extensive marbling and dermal autolysis.",
     },
     rigor: {
-      enabled: true,
+      enabled: false,
       progressionStage: "absent_late",
       muscleGroups: {
         jawTemporomandibular: false,
@@ -223,10 +223,10 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
     },
     decomposition: {
       enabled: true,
-      headNeckScore: 6,
-      trunkScore: 6,
+      headNeckScore: 4,
+      trunkScore: 4,
       limbsScore: 4,
-      totalBodyScore: 16,
+      totalBodyScore: 12,
       marblingPresent: true,
       rightIliacDiscoloration: true,
       bloatingAndPurge: true,
@@ -239,7 +239,7 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
       enabled: true,
       primaryInsectGroup: "Calliphoridae_blowfly",
       developmentalStage: "larva_instar_3_feeding",
-      larvalLengthMm: 13.5,
+      larvalLengthMm: 12.0,
       maggotMassTempC: 29.8,
       indoorAccessDelayHours: 0,
       speciesName: "Calliphora vicina",
@@ -252,9 +252,9 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
   },
   {
     id: "preset-relocation-conflict",
-    title: "Critical Inconsistency: Body Relocation & Staging (~18h) [Conflict]",
+    title: "Critical Inconsistency: Body Relocation & Staging (~18–24h) [Conflict]",
     category: "Conflicting Evidence",
-    description: "Body discovered supine (face-up), but fixed hypostasis is anterior (face-down), proving post-mortem movement.",
+    description: "Body discovered supine (face-up), but fixed hypostasis is anterior (face-down), proving post-mortem movement. Output PMI window: 13–30 hours.",
     sceneSummary: "Body found lying supine in a living room. Rigor is complete, but deep violaceous lividity is non-blanching along the anterior chest and thighs.",
     isHarmonic: false,
     metadata: {
@@ -305,7 +305,7 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
       coldStiffeningSuspected: false,
     },
     decomposition: {
-      enabled: true,
+      enabled: false,
       headNeckScore: 2,
       trunkScore: 2,
       limbsScore: 1,
@@ -328,15 +328,15 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
     },
     metabolomics: {
       enabled: true,
-      vitreousPotassiumMmolL: 6.8,
+      vitreousPotassiumMmolL: 7.8,
       suspectedRenalFailureOrTrauma: false,
     },
   },
   {
     id: "preset-cold-cherry-red",
-    title: "Hypothermia & Cold Exposure - Cherry-Red Lividity (~18h) [Environmental]",
+    title: "Hypothermia & Cold Exposure - Cherry-Red Lividity (~12–16h) [Environmental]",
     category: "Environmental Anomaly",
-    description: "Mountain trail exposure in near-freezing conditions (4.0°C) with bright pink/cherry lividity and delayed cooling.",
+    description: "Mountain trail exposure in near-freezing conditions (4.0°C) with bright cherry-pink lividity, cold stiffening, and delayed cooling. Output PMI window: 8–17 hours.",
     sceneSummary: "Individual located in unheated cabin shed in winter. Ambient temp 4.0°C. Cherry-red hypostasis and muscle cold-stiffening.",
     isHarmonic: false,
     metadata: {
@@ -387,7 +387,7 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
       coldStiffeningSuspected: true,
     },
     decomposition: {
-      enabled: true,
+      enabled: false,
       headNeckScore: 1,
       trunkScore: 1,
       limbsScore: 1,
@@ -401,7 +401,7 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
       effectiveMeanTempC: 4.0,
     },
     entomology: {
-      enabled: true,
+      enabled: false,
       primaryInsectGroup: "none",
       developmentalStage: "none",
       larvalLengthMm: 0,

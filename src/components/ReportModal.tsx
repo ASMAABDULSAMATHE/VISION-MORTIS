@@ -151,6 +151,7 @@ PHOTOGRAPHIC EVIDENCE & COMPUTER VISION OBSERVATIONS:
 ${
   imagesList.length > 0
     ? `• Total Photos Uploaded: ${imagesList.length}\n` +
+      (visionData?.forensicObservations ? `• Photo Analysis Summary: ${visionData.forensicObservations}\n` : "") +
       imagesList
         .map(
           (img, idx) =>
@@ -164,11 +165,11 @@ ${
       `\n• Vision Detected Insects: ${visionData?.detectedEntomology ? `${visionData.detectedEntomology.primaryInsectStage || "Present"}` : "N/A"}`
     : "No photographic evidence or computer vision detections attached."
 }
-
---------------------------------------------------------------------------------
-EXAMINER'S QUALITATIVE PATHOLOGY NOTES & NARRATIVE:
-${caseData.examinersNotes || "No specific qualitative notes provided by the medical examiner."}
-
+${
+  caseData.examinersNotes && caseData.examinersNotes.trim().length > 0
+    ? `\n--------------------------------------------------------------------------------\nEXAMINER'S QUALITATIVE PATHOLOGY NOTES & NARRATIVE:\n${caseData.examinersNotes}\n`
+    : ""
+}
 --------------------------------------------------------------------------------
 PHYSIOLOGICAL INDICATOR SUMMARY TABLE:
 ${result.indicatorEvaluations
