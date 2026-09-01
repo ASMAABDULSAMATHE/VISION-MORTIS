@@ -371,10 +371,10 @@ export function extractXgbFeatureVector(caseData: CaseDataInput): {
   };
 
   // Environmental & Body Biometrics
-  const ambientTemp = algor.ambientTempC ?? meta.ambientTempC ?? 20.0;
+  const ambientTemp = algor.ambientTempC ?? (caseData as any).ambientTempC ?? meta.ambientTempC ?? 20.0;
   const bodyTemp = algor.rectalTempC ?? (algor.enabled ? 32.0 : 37.0);
-  const humidity = meta.relativeHumidityPercent ?? 55.0;
-  const bodyMass = algor.bodyWeightKg ?? meta.bodyWeightKg ?? 70.0;
+  const humidity = (caseData as any).relativeHumidityPercent ?? meta.relativeHumidityPercent ?? 55.0;
+  const bodyMass = algor.bodyWeightKg ?? (caseData as any).bodyWeightKg ?? meta.bodyWeightKg ?? 70.0;
 
   setContinuousFeature("ambient_temperature_C", ambientTemp, 20.0);
   setContinuousFeature("relative_humidity_percent", humidity, 55.0);

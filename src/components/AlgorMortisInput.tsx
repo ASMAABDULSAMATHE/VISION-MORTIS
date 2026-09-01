@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { AlgorMortisData } from "../types";
 import { calculateHenssgeAlgorMortis } from "../utils/forensicCalculations";
+import { formatIndicatorTimestamp } from "../utils/validation";
 import {
   Thermometer,
   Wind,
@@ -10,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   HelpCircle,
+  Clock,
 } from "lucide-react";
 
 interface Props {
@@ -17,6 +19,7 @@ interface Props {
   onChange: (updated: AlgorMortisData) => void;
   isOpen?: boolean;
   onToggleOpen?: () => void;
+  baselineData?: AlgorMortisData;
 }
 
 const CLOTHING_PRESETS = [
@@ -34,6 +37,7 @@ export const AlgorMortisInput: React.FC<Props> = ({
   onChange,
   isOpen,
   onToggleOpen,
+  baselineData,
 }) => {
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const [showExtraInfo, setShowExtraInfo] = useState(false);
@@ -60,11 +64,17 @@ export const AlgorMortisInput: React.FC<Props> = ({
             <Thermometer className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-slate-100 flex items-center gap-2">
-              Algor Mortis
+            <h3 className="text-base font-semibold text-slate-100 flex items-center gap-2 flex-wrap">
+              <span>Algor Mortis</span>
               <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-teal-950/80 text-teal-400 border border-teal-800/50">
                 0 – 24 Hours
               </span>
+              {data.recordedAt && (
+                <span className="text-[10px] font-mono text-teal-300 px-2 py-0.5 rounded-md bg-slate-950/90 border border-slate-800 flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-teal-400" />
+                  <span>Logged: {formatIndicatorTimestamp(data.recordedAt)}</span>
+                </span>
+              )}
             </h3>
             <p className="text-xs text-slate-400">Henssge double-exponential nomogram core body temperature cooling</p>
           </div>
@@ -109,7 +119,14 @@ export const AlgorMortisInput: React.FC<Props> = ({
                     <span className="text-slate-300 font-medium flex items-center gap-1.5">
                       <Thermometer className="w-3.5 h-3.5 text-rose-400" /> Core / Rectal Temp
                     </span>
-                    <span className="text-teal-400 font-bold text-sm font-mono">{data.rectalTempC.toFixed(1)} °C</span>
+                    <div className="flex items-center gap-1.5">
+                      {baselineData && baselineData.rectalTempC !== data.rectalTempC && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-800/80 font-mono">
+                          Base: {baselineData.rectalTempC.toFixed(1)}°C
+                        </span>
+                      )}
+                      <span className="text-teal-400 font-bold text-sm font-mono">{data.rectalTempC.toFixed(1)} °C</span>
+                    </div>
                   </div>
                   <input
                     type="range"
@@ -132,7 +149,14 @@ export const AlgorMortisInput: React.FC<Props> = ({
                     <span className="text-slate-300 font-medium flex items-center gap-1.5">
                       <Thermometer className="w-3.5 h-3.5 text-amber-400" /> Ambient Scene Temp
                     </span>
-                    <span className="text-amber-400 font-bold text-sm font-mono">{data.ambientTempC.toFixed(1)} °C</span>
+                    <div className="flex items-center gap-1.5">
+                      {baselineData && baselineData.ambientTempC !== data.ambientTempC && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-800/80 font-mono">
+                          Base: {baselineData.ambientTempC.toFixed(1)}°C
+                        </span>
+                      )}
+                      <span className="text-amber-400 font-bold text-sm font-mono">{data.ambientTempC.toFixed(1)} °C</span>
+                    </div>
                   </div>
                   <input
                     type="range"
@@ -154,7 +178,14 @@ export const AlgorMortisInput: React.FC<Props> = ({
                 <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/80 space-y-2">
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-slate-300 font-medium">Estimated Body Mass</span>
-                    <span className="text-emerald-400 font-bold text-sm font-mono">{data.bodyWeightKg} kg</span>
+                    <div className="flex items-center gap-1.5">
+                      {baselineData && baselineData.bodyWeightKg !== data.bodyWeightKg && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-800/80 font-mono">
+                          Base: {baselineData.bodyWeightKg}kg
+                        </span>
+                      )}
+                      <span className="text-emerald-400 font-bold text-sm font-mono">{data.bodyWeightKg} kg</span>
+                    </div>
                   </div>
                   <input
                     type="range"

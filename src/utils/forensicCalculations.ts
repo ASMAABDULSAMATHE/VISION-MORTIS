@@ -199,9 +199,18 @@ export function evaluateRigorMortis(rigor: RigorMortisData): {
   // Acceleration factor for pre-death convulsions or violent physical struggle (rapid ATP depletion)
   const exertionFactor = preDeathPhysicalExertion === "violent_convulsions_strenuous" ? 0.5 : preDeathPhysicalExertion === "moderate" ? 0.8 : 1.0;
 
+  let baseResult: {
+    minHours: number;
+    maxHours: number;
+    optimalHours: number;
+    confidence: number;
+    status: "optimal_window" | "moderate_utility" | "outside_reliable_window" | "conflict_flagged";
+    notes: string;
+  };
+
   switch (progressionStage) {
     case "absent_early":
-      return {
+      baseResult = {
         minHours: 0,
         maxHours: 3 * exertionFactor,
         optimalHours: 1.5 * exertionFactor,
@@ -209,8 +218,9 @@ export function evaluateRigorMortis(rigor: RigorMortisData): {
         status: "optimal_window",
         notes: "Early flaccidity prior to onset of rigor mortis (ATP levels in skeletal muscle still sufficient, < 2-3h).",
       };
+      break;
     case "developing_jaw_neck":
-      return {
+      baseResult = {
         minHours: 2 * exertionFactor,
         maxHours: 7 * exertionFactor,
         optimalHours: 4.5 * exertionFactor,
@@ -218,8 +228,9 @@ export function evaluateRigorMortis(rigor: RigorMortisData): {
         status: "optimal_window",
         notes: "Rigor developing according to Nysten's law: detected in temporomandibular joint, facial and cervical muscles (2 to 6h).",
       };
+      break;
     case "moderate_upper_trunk":
-      return {
+      baseResult = {
         minHours: 6 * exertionFactor,
         maxHours: 12 * exertionFactor,
         optimalHours: 9 * exertionFactor,
@@ -227,8 +238,9 @@ export function evaluateRigorMortis(rigor: RigorMortisData): {
         status: "optimal_window",
         notes: "Rigor progressing to upper extremities, thorax, and elbows (6 to 12h).",
       };
+      break;
     case "complete_generalized":
-      return {
+      baseResult = {
         minHours: 12 * exertionFactor,
         maxHours: 24,
         optimalHours: 18,
@@ -236,8 +248,9 @@ export function evaluateRigorMortis(rigor: RigorMortisData): {
         status: "optimal_window",
         notes: "Full peak generalized rigidity in all muscle groups (12 to 24h).",
       };
+      break;
     case "resolving_flaccid":
-      return {
+      baseResult = {
         minHours: 24,
         maxHours: 48,
         optimalHours: 34,
@@ -245,8 +258,9 @@ export function evaluateRigorMortis(rigor: RigorMortisData): {
         status: "optimal_window",
         notes: "Rigor secondary resolution (flaccidity progressing via myofilament autolysis, 24 to 48h).",
       };
+      break;
     case "absent_late":
-      return {
+      baseResult = {
         minHours: 40,
         maxHours: 120,
         optimalHours: 60,
@@ -254,9 +268,20 @@ export function evaluateRigorMortis(rigor: RigorMortisData): {
         status: "moderate_utility",
         notes: "Rigor mortis completely passed (secondary flaccidity complete, > 36-48h).",
       };
+      break;
     default:
-      return { minHours: 4, maxHours: 24, optimalHours: 14, confidence: 50, status: "moderate_utility", notes: "Indeterminate rigor stage." };
+      baseResult = { minHours: 4, maxHours: 24, optimalHours: 14, confidence: 50, status: "moderate_utility", notes: "Indeterminate rigor stage." };
+      break;
   }
+
+  // Adjust for cold stiffening / muscle water crystallization (<4°C)
+  if (coldStiffeningSuspected) {
+    baseResult.confidence = Math.min(baseResult.confidence, 40);
+    baseResult.status = "conflict_flagged";
+    baseResult.notes += " Warning: Cold stiffening / freezing suspected (<4°C). Freezing of muscle water physically mimics biochemical rigor mortis; true rigor cannot be evaluated reliably until thawed.";
+  }
+
+  return baseResult;
 }
 
 /**
@@ -289,11 +314,22 @@ export function evaluateDecomposition(decomp: DecompositionData): {
   const hoursMin = Number((daysMin * 24).toFixed(1));
   const hoursMax = Number((daysMax * 24).toFixed(1));
 
-  let confidence = 85;
+  // For fresh remains (TBS 3-4, completely fresh anatomical regions), autolysis has not initiated.
+  // Megyesi's regression model begins at active decay stages; fresh state is constrained to 0-24h window.
   if (tbs <= 4) {
-    // TBS 3-4 is fresh, best estimated by early indicators
-    confidence = 65;
-  } else if (tbs > 30) {
+    return {
+      minHours: 0,
+      maxHours: 24,
+      optimalHours: 8,
+      confidence: 70,
+      addCalculated: Number(addMedian.toFixed(1)),
+      status: "moderate_utility",
+      notes: `Fresh morphological post-mortem state (TBS=${tbs}/35). Macroscopic autolytic decomposition has not initiated; post-mortem interval is within the initial 24 hours.`,
+    };
+  }
+
+  let confidence = 85;
+  if (tbs > 30) {
     confidence = 75;
   }
 
@@ -425,14 +461,66 @@ export function evaluateMetabolomics(metab: MetabolomicsData): {
   confidence: number;
   status: "optimal_window" | "moderate_utility" | "outside_reliable_window" | "conflict_flagged";
   notes: string;
+  effectivePotassiumMmolL: number;
+  rawPotassiumMmolL: number;
+  kExcessSubtracted: number;
+  dehydrationRatio: number;
+  naPmiEstimate?: number;
+  pmiMadea: number;
+  pmiSturner: number;
 } {
-  const k = metab.vitreousPotassiumMmolL;
-  const pmiMadea = Math.max(0, 5.26 * (k - 4.0));
-  const pmiSturner = Math.max(0, 7.14 * k - 39.1);
-  const primaryKPmi = k <= 4.0 ? 1.5 : (pmiMadea + pmiSturner) / 2;
+  // Check for Vitreous Urea Nitrogen (VUN) and Vitreous Sodium ([Na+]) from custom items or direct fields
+  const vunItem = metab.selectedMetabolites?.find((m) => m.metaboliteKey === "urea_nitrogen");
+  const vun = vunItem ? vunItem.measuredValue : metab.ureaNitrogenMgDl;
 
-  // Check additional user-selected metabolites
+  const naItem = metab.selectedMetabolites?.find((m) => m.metaboliteKey === "vitreous_sodium");
+  const na = naItem ? naItem.measuredValue : metab.vitreousSodiumMmolL;
+
+  let k = metab.vitreousPotassiumMmolL;
+  let uremicCorrectionApplied = false;
+  let dehydrationConcentrationApplied = false;
+
+  // 1. Antemortem Uremia / Renal Failure Correction via VUN
+  // Antemortem baseline potassium is normally 3.8-4.0 mmol/L. In renal failure / azotemia (VUN > 30 mg/dL),
+  // baseline K+ is elevated (antemortem hyperkalemia).
+  let kExcess = 0;
+  if (vun !== undefined && vun > 30) {
+    kExcess = Math.min(3.8, Number(((vun - 25) * 0.035).toFixed(2)));
+    k = Math.max(4.0, Number((k - kExcess).toFixed(2)));
+    uremicCorrectionApplied = true;
+  }
+
+  // 2. Severe Hypernatremic Dehydration Correction via Na+
+  // If [Na+] > 152 mmol/L, dehydration hemoconcentrates vitreous solutes
+  let hypernatremicRatio = 1.0;
+  if (na !== undefined && na > 152) {
+    hypernatremicRatio = Number((na / 142).toFixed(2));
+    k = Math.max(4.0, Number((k / hypernatremicRatio).toFixed(2)));
+    dehydrationConcentrationApplied = true;
+  }
+
+  const pmiMadea = Math.max(0.5, 5.26 * (k - 4.0));
+  const pmiSturner = 7.14 * k - 39.1;
+  // Sturner equation has an x-intercept at 5.47 mmol/L; for lower values, use Madea's established early slope
+  let primaryKPmi: number;
+  if (k <= 4.0) {
+    primaryKPmi = 1.0;
+  } else if (pmiSturner <= 0) {
+    primaryKPmi = pmiMadea;
+  } else {
+    primaryKPmi = (pmiMadea + pmiSturner) / 2;
+  }
+
+  // Check additional metabolites & direct Vitreous Sodium decline
   const additionalPmis: Array<{ pmi: number; weight: number }> = [{ pmi: primaryKPmi, weight: 1.0 }];
+
+  // Direct Vitreous Sodium post-mortem decline regression (Coe / Madea model: ~0.5 mmol/L per hour from 142 baseline)
+  let naPmiEstimate: number | undefined = undefined;
+  const hasNaInSelected = metab.selectedMetabolites?.some((m) => m.metaboliteKey === "vitreous_sodium");
+  if (!hasNaInSelected && na !== undefined && na <= 142 && na >= 100) {
+    naPmiEstimate = Math.max(1, Math.min(72, Number(((142 - na) / 0.5).toFixed(1))));
+    additionalPmis.push({ pmi: naPmiEstimate, weight: 0.65 });
+  }
 
   if (metab.selectedMetabolites && metab.selectedMetabolites.length > 0) {
     for (const item of metab.selectedMetabolites) {
@@ -450,9 +538,30 @@ export function evaluateMetabolomics(metab: MetabolomicsData): {
   const maxH = Number((weightedPmi + standardErrorHours).toFixed(1));
 
   let confidence = 85;
-  if (k > 16.0) confidence = 55;
+  if (metab.vitreousPotassiumMmolL > 16.0) confidence = 55;
   if (metab.selectedMetabolites && metab.selectedMetabolites.length > 1) {
     confidence = Math.min(95, confidence + 5);
+  }
+
+  let status: "optimal_window" | "moderate_utility" | "outside_reliable_window" | "conflict_flagged" =
+    metab.vitreousPotassiumMmolL <= 15 ? "optimal_window" : "moderate_utility";
+  let notes = `Metabolomics multi-analyte consensus across ${additionalPmis.length} marker(s) yielding est. ${weightedPmi.toFixed(1)}h window.`;
+
+  if (uremicCorrectionApplied && vun !== undefined) {
+    notes += ` [VUN Uremic Correction]: VUN=${vun} mg/dL indicates antemortem azotemia; baseline [K⁺] corrected to prevent false overestimation.`;
+    status = "conflict_flagged";
+    confidence = Math.min(confidence, 55);
+  }
+
+  if (dehydrationConcentrationApplied && na !== undefined) {
+    notes += ` [Na⁺ Correction]: [Na⁺]=${na} mmol/L indicates hypertonic dehydration; [K⁺] adjusted for solute concentration.`;
+  }
+
+  // Antemortem renal disease or ocular hemorrhage caveat
+  if (metab.suspectedRenalFailureOrTrauma) {
+    confidence = Math.min(confidence, 40);
+    status = "conflict_flagged";
+    notes += " Warning: Antemortem renal failure or ocular trauma suspected. Intracellular potassium release may reflect pre-existing uremia rather than post-mortem autolysis.";
   }
 
   return {
@@ -460,8 +569,15 @@ export function evaluateMetabolomics(metab: MetabolomicsData): {
     maxHours: maxH,
     optimalHours: Number(weightedPmi.toFixed(1)),
     confidence,
-    status: k <= 15 ? "optimal_window" : "moderate_utility",
-    notes: `Metabolomics multi-analyte consensus across ${additionalPmis.length} marker(s) yielding est. ${weightedPmi.toFixed(1)}h window.`,
+    status,
+    notes,
+    effectivePotassiumMmolL: Number(k.toFixed(2)),
+    rawPotassiumMmolL: metab.vitreousPotassiumMmolL,
+    kExcessSubtracted: kExcess,
+    dehydrationRatio: hypernatremicRatio,
+    naPmiEstimate,
+    pmiMadea: Number(pmiMadea.toFixed(1)),
+    pmiSturner: Number(pmiSturner.toFixed(1)),
   };
 }
 
@@ -576,6 +692,74 @@ export function detectInconsistencies(
     }
   }
 
+  // 5. Suspected antemortem renal failure or ocular trauma alert
+  if (metabolomics.enabled && metabolomics.suspectedRenalFailureOrTrauma) {
+    alerts.push({
+      id: "alert-metabolomics-renal-trauma",
+      severity: "warning",
+      title: "Vitreous Potassium Affected by Antemortem Renal Failure or Trauma",
+      description: "Antemortem renal failure or ocular trauma is suspected. Potassium levels may be elevated due to systemic uremia or local hemorrhage rather than normal post-mortem retinal autolysis.",
+      indicatorA: "Metabolomics ([K+])",
+      indicatorB: "Clinical Pathological History",
+      forensicImplication: "Vitreous potassium should be interpreted with caution and down-weighted in the final composite PMI calculation.",
+    });
+  }
+
+  // 5b. Vitreous Urea Nitrogen (VUN) elevation alert
+  const vunItem = metabolomics.selectedMetabolites?.find((m) => m.metaboliteKey === "urea_nitrogen");
+  const vun = vunItem ? vunItem.measuredValue : metabolomics.ureaNitrogenMgDl;
+  if (metabolomics.enabled && vun !== undefined && vun > 40) {
+    alerts.push({
+      id: "alert-metabolomics-vun-elevation",
+      severity: "warning",
+      title: "Elevated Vitreous Urea Nitrogen (VUN) — Antemortem Azotemia / Uremia",
+      description: `Vitreous Urea Nitrogen is elevated at ${vun} mg/dL (normal: 10–25 mg/dL), indicating antemortem renal failure or acute uremic state.`,
+      indicatorA: "Vitreous Urea Nitrogen (VUN)",
+      indicatorB: "Vitreous Potassium ([K⁺])",
+      forensicImplication: "Antemortem hyperkalemia is present. Uncorrected [K⁺] formulas will grossly overestimate PMI (by 10–25+ hours). Baseline potassium offset correction applied.",
+    });
+  }
+
+  // 5c. Vitreous Sodium ([Na⁺]) electrolyte derangement alert
+  const naItem = metabolomics.selectedMetabolites?.find((m) => m.metaboliteKey === "vitreous_sodium");
+  const na = naItem ? naItem.measuredValue : metabolomics.vitreousSodiumMmolL;
+  if (metabolomics.enabled && na !== undefined) {
+    if (na > 152) {
+      alerts.push({
+        id: "alert-metabolomics-hypernatremia",
+        severity: "warning",
+        title: "Vitreous Hypernatremia — Severe Dehydration / Hemoconcentration",
+        description: `Vitreous sodium is elevated at ${na} mmol/L (normal: 135–150 mmol/L), indicating profound antemortem hypertonic dehydration.`,
+        indicatorA: "Vitreous Sodium ([Na⁺])",
+        indicatorB: "Vitreous Potassium ([K⁺])",
+        forensicImplication: "Osmotic fluid contraction concentrates all vitreous electrolytes. Unadjusted [K⁺] overestimates time of death; normalization applied.",
+      });
+    } else if (na < 125) {
+      alerts.push({
+        id: "alert-metabolomics-hyponatremia",
+        severity: "warning",
+        title: "Vitreous Hyponatremia — Hemodilution / Water Intoxication",
+        description: `Vitreous sodium is markedly depleted at ${na} mmol/L (normal: 135–150 mmol/L).`,
+        indicatorA: "Vitreous Sodium ([Na⁺])",
+        indicatorB: "Scene Environment / Immersion",
+        forensicImplication: "May indicate antemortem hypotonic dilution, freshwater immersion, or SIADH, which dilutes vitreous [K⁺].",
+      });
+    }
+  }
+
+  // 6. Cold stiffening / freezing advisory
+  if (rigor.enabled && rigor.coldStiffeningSuspected) {
+    alerts.push({
+      id: "alert-cold-stiffening",
+      severity: "warning",
+      title: "Cold Stiffening / Freezing Suspected (<4°C)",
+      description: "Freezing of intra- and extracellular water in muscle tissue physically mimics rigor mortis.",
+      indicatorA: "Rigor Mortis",
+      indicatorB: "Environmental Exposure",
+      forensicImplication: "Rigor mortis staging cannot be reliably determined until the remains have thawed under controlled conditions.",
+    });
+  }
+
   return alerts;
 }
 
@@ -610,7 +794,7 @@ export function calculateCompositePmi(
       sceneLocation: c.locationDescription,
       environmentType: "indoor_residential",
       ambientTempC: c.ambientTempC,
-      relativeHumidityPercent: 50,
+      relativeHumidityPercent: c.relativeHumidityPercent ?? 50,
       bodyFoundPosition: c.bodyFoundPosition,
       bodyWeightKg: c.bodyWeightKg,
       notes: "",
@@ -744,8 +928,14 @@ export function calculateCompositePmi(
   if (decompEval && decomp.enabled) {
     const tbs = decomp.headNeckScore + decomp.trunkScore + decomp.limbsScore;
     let w = 1.0;
-    if (tbs > 8) w = 3.2;
-    if (tbs > 18) w = 4.0;
+    if (tbs <= 4) {
+      // In fresh stage (TBS 3-4), early markers (Algor, Livor, Rigor) dominate
+      w = 0.4;
+    } else if (tbs > 18) {
+      w = 4.0;
+    } else if (tbs > 8) {
+      w = 3.2;
+    }
     indicators.push({
       name: "Decomposition (Megyesi TBS / ADD)",
       category: "Decomposition",

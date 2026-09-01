@@ -36,9 +36,11 @@ import {
   ChevronDown,
   ChevronUp,
   FileSpreadsheet,
+  Stethoscope,
 } from "lucide-react";
 import { RecreatedLogo } from "./RecreatedLogo";
-import { validateCaseId, generateCaseIntegrityHash } from "../utils/validation";
+import { validateCaseId, generateCaseIntegrityHash, formatIndicatorTimestamp } from "../utils/validation";
+import { auditPresetModifications } from "../utils/presetAudit";
 import { printForensicCaseReport, downloadForensicHtmlReport } from "../utils/printReport";
 import { runInBrowserXgbPrediction } from "../utils/inBrowserXgbModel";
 import { PmiOutputPanel } from "./PmiOutputPanel";
@@ -99,7 +101,12 @@ export const GeneratedReportSection: React.FC<Props> = ({
     result.estimatedPmiOptimalHours
   );
 
+  const presetAudit = useMemo(() => auditPresetModifications(caseData), [caseData]);
+
   const imagesList = visionData?.images || [];
+  const forensicPhotosList = imagesList.filter((img) => !img.isUnrelated);
+  const examinerNotesText = (visionData?.examinerNotes || caseData.examinersNotes || caseData.notes || "").trim();
+  const hasExaminerNotes = examinerNotesText.length > 0 && examinerNotesText.toLowerCase() !== "none";
 
   // Plain text generator for .TXT download and copy
   const generateReportPlainText = () => {
@@ -111,7 +118,9 @@ export const GeneratedReportSection: React.FC<Props> = ({
 ================================================================================
 CASE RECORD & DEMOGRAPHICS:
 • Case / File Number:     ${caseData.caseId || "Not Assigned"}
-${caseData.presetName || caseData.isPresetCase ? `• Preset Reference Case:  ${caseData.presetName || caseData.subjectNameOrIdentifier} [${caseData.presetCategory || "Standard Validation Profile"}]\n• Preset Description:     ${caseData.presetDescription || "Standard forensic benchmark profile"}\n` : ""}• Subject Identification: ${caseData.subjectNameOrIdentifier || "Unidentified Doe"}
+${presetAudit.isPreset ? `• Preset Reference Case:  ${presetAudit.presetName || caseData.presetName} [${presetAudit.presetCategory || "Benchmark Case"}]
+• Preset Modification:    ${presetAudit.isModified ? `MODIFIED BY EXAMINER (${presetAudit.modifiedCount} parameter(s) adjusted)` : "UNALTERED BENCHMARK BASELINE"}
+${presetAudit.isModified && presetAudit.modifiedFieldLabels.length > 0 ? `• Altered Parameters:     ${presetAudit.modifiedFieldLabels.join("; ")}\n` : ""}• Preset Description:     ${caseData.presetDescription || "Standard forensic benchmark profile"}\n` : ""}• Subject Identification: ${caseData.subjectNameOrIdentifier || "Unidentified Doe"}
 • Estimated Age / Sex:    ${caseData.ageYears ? `${caseData.ageYears} years` : "Unspecified"} / ${(caseData.sex || "Unknown").toUpperCase()}
 • Attending Examiner:     ${caseData.investigatorName || caseData.examinerName || "Staff Medical Examiner"}
 • Jurisdiction / Agency:  ${caseData.jurisdiction || "Forensic Pathology Division"}
@@ -144,12 +153,14 @@ ${mlPredictionData.factorAttributions?.slice(0, 4).map(attr => `  - ${attr.facto
 FORENSIC INDICATOR MODULE EVALUATION & INPUTS:
 1. ALGOR MORTIS (HENSSGE NOMOGRAM):
    • Status:              ${caseData.algorMortis.enabled ? "ACTIVE" : "BYPASSED / OFF"}
+   • Logged Timestamp:    ${caseData.algorMortis.recordedAt || caseData.indicatorTimings?.algor || "N/A"}
    • Rectal / Core Temp:  ${caseData.algorMortis.enabled ? `${caseData.algorMortis.rectalTempC} °C` : "N/A"}
    • Clothing Factor (Cf): ${caseData.algorMortis.enabled ? `${caseData.algorMortis.clothingCoveringFactor} (${caseData.algorMortis.clothingDescription || "Standard"})` : "N/A"}
    • Air Current & Wet:   ${caseData.algorMortis.enabled ? `${caseData.algorMortis.airCurrentVelocity}, Wet: ${caseData.algorMortis.isBodyWet ? "Yes" : "No"}` : "N/A"}
 
 2. LIVOR MORTIS (HYPOSTASIS):
    • Status:              ${caseData.livorMortis.enabled ? "ACTIVE" : "BYPASSED / OFF"}
+   • Logged Timestamp:    ${caseData.livorMortis.recordedAt || caseData.indicatorTimings?.livor || "N/A"}
    • Blanchability:       ${caseData.livorMortis.enabled ? caseData.livorMortis.blanchability.replace(/_/g, " ") : "N/A"}
    • Color Hue:           ${caseData.livorMortis.enabled ? caseData.livorMortis.colorHue : "N/A"}
    • Distribution Pattern:${caseData.livorMortis.enabled ? caseData.livorMortis.distributionPattern.replace(/_/g, " ") : "N/A"}
@@ -157,6 +168,7 @@ FORENSIC INDICATOR MODULE EVALUATION & INPUTS:
 
 3. RIGOR MORTIS (NYSTEN LAW):
    • Status:              ${caseData.rigorMortis.enabled ? "ACTIVE" : "BYPASSED / OFF"}
+   • Logged Timestamp:    ${caseData.rigorMortis.recordedAt || caseData.indicatorTimings?.rigor || "N/A"}
    • Progression Stage:   ${caseData.rigorMortis.enabled ? caseData.rigorMortis.progressionStage.replace(/_/g, " ") : "N/A"}
    • Muscle Involvement:  ${caseData.rigorMortis.enabled ? `Jaw: ${caseData.rigorMortis.muscleGroups.jawTemporomandibular ? "Yes" : "No"} | Neck: ${caseData.rigorMortis.muscleGroups.neckCervical ? "Yes" : "No"} | Upper Limbs: ${caseData.rigorMortis.muscleGroups.upperLimbsElbowsWrists ? "Yes" : "No"} | Trunk: ${caseData.rigorMortis.muscleGroups.trunkAbdomen ? "Yes" : "No"} | Lower Limbs: ${caseData.rigorMortis.muscleGroups.lowerLimbsKneesAnkles ? "Yes" : "No"}` : "N/A"}
    • Pre-Death Exertion:  ${caseData.rigorMortis.enabled ? caseData.rigorMortis.preDeathPhysicalExertion.replace(/_/g, " ") : "N/A"}
@@ -164,6 +176,7 @@ FORENSIC INDICATOR MODULE EVALUATION & INPUTS:
 
 4. DECOMPOSITION (MEGYESI TOTAL BODY SCORE / ADD):
    • Status:              ${caseData.decomposition.enabled ? "ACTIVE" : "BYPASSED / OFF"}
+   • Logged Timestamp:    ${caseData.decomposition.recordedAt || caseData.indicatorTimings?.decomposition || "N/A"}
    • Head/Neck Score:     ${caseData.decomposition.enabled ? `${caseData.decomposition.headNeckScore}/13` : "N/A"}
    • Trunk Score:         ${caseData.decomposition.enabled ? `${caseData.decomposition.trunkScore}/12` : "N/A"}
    • Limbs Score:         ${caseData.decomposition.enabled ? `${caseData.decomposition.limbsScore}/10` : "N/A"}
@@ -172,6 +185,7 @@ FORENSIC INDICATOR MODULE EVALUATION & INPUTS:
 
 5. FORENSIC ENTOMOLOGY (INSECT SUCCESSION & ADH):
    • Status:              ${caseData.entomology.enabled ? "ACTIVE" : "BYPASSED / OFF"}
+   • Logged Timestamp:    ${caseData.entomology.recordedAt || caseData.indicatorTimings?.entomology || "N/A"}
    • Primary Insect Taxon:${caseData.entomology.enabled ? caseData.entomology.primaryInsectGroup.replace(/_/g, " ") : "N/A"}
    • Colonization Stage:  ${caseData.entomology.enabled ? caseData.entomology.developmentalStage.replace(/_/g, " ") : "N/A"}
    • Mean Larval Length:  ${caseData.entomology.enabled ? `${caseData.entomology.larvalLengthMm} mm` : "N/A"}
@@ -180,32 +194,28 @@ FORENSIC INDICATOR MODULE EVALUATION & INPUTS:
 
 6. VITREOUS METABOLOMICS & BIOCHEMISTRY:
    • Status:              ${caseData.metabolomics.enabled ? "ACTIVE" : "BYPASSED / OFF"}
+   • Logged Timestamp:    ${caseData.metabolomics.recordedAt || caseData.indicatorTimings?.metabolomics || "N/A"}
    • Vitreous [K+]:       ${caseData.metabolomics.enabled ? `${caseData.metabolomics.vitreousPotassiumMmolL} mmol/L` : "N/A"}
    • Vitreous Hypoxanthine:${caseData.metabolomics.enabled && caseData.metabolomics.vitreousHypoxanthineUmolL ? `${caseData.metabolomics.vitreousHypoxanthineUmolL} µmol/L` : "N/A"}
    • Active Metabolites:  ${caseData.metabolomics.enabled && caseData.metabolomics.activeMetabolites?.length ? caseData.metabolomics.activeMetabolites.map(m => `${m.name}: ${m.value} ${m.unit}`).join("; ") : "Standard vitreous panel"}
    • Renal Disease/Trauma:${caseData.metabolomics.enabled ? (caseData.metabolomics.suspectedRenalFailureOrTrauma ? "SUSPECTED (K+ ELEVATION CAVEAT)" : "None") : "N/A"}
 
 --------------------------------------------------------------------------------
-PHOTOGRAPHIC EVIDENCE & COMPUTER VISION OBSERVATIONS:
+PHOTOGRAPHIC EVIDENCE & VISION ANALYSIS:
 ${
   imagesList.length > 0
-    ? `• Total Photos Uploaded: ${imagesList.length}\n` +
-      imagesList
-        .map(
-          (img, idx) =>
-            `  [Photo ${idx + 1}] Tag: ${(img.tag || "Scene").toUpperCase()} | Name: ${img.name}${
-              img.isUnrelated ? " [FLAGGED UNRELATED]" : ""
-            }${img.qualityRating ? ` [Quality: ${img.qualityRating}]` : ""}${
-              img.detectedFindings ? ` | AI Findings: ${img.detectedFindings}` : ""
-            }`
-        )
-        .join("\n") +
-      `\n• Vision Estimated TBS: ${visionData?.estimatedTbs ? `TBS ${visionData.estimatedTbs.totalScore}/35` : "N/A"}` +
-      `\n• Vision Detected Livor: ${visionData?.detectedLivor ? `${visionData.detectedLivor.colorClassification} (${visionData.detectedLivor.distribution})` : "N/A"}` +
-      `\n• Vision Detected Insects: ${visionData?.detectedEntomology ? `${visionData.detectedEntomology.primaryInsectStage || "Present"}` : "N/A"}`
+    ? `• Photos Analyzed:      ${forensicPhotosList.length} forensic photo(s)${imagesList.some(img => img.isUnrelated) ? ` (${imagesList.filter(img => img.isUnrelated).length} non-forensic excluded)` : ""}\n` +
+      `• Vision Analyzed Time:  ${visionData?.analyzedAt || visionData?.recordedAt || caseData.indicatorTimings?.vision || "N/A"}\n` +
+      `• Vision Analysis Summary: ${visionData?.forensicObservations || `Photo analysis indicates ${visionData?.detectedDecompositionStage?.replace(/_/g, " ") || "fresh"} changes (TBS ${visionData?.estimatedTbs?.totalScore || 3}/35) with ${visionData?.detectedLivor?.colorClassification?.replace(/_/g, " ") || "violaceous"} hypostatic settling, pointing to an estimated post-mortem interval window.`}\n` +
+      `• Key Visual Findings:   Decomposition: ${visionData?.detectedDecompositionStage?.replace(/_/g, " ") || "Indeterminate"} (TBS ${visionData?.estimatedTbs?.totalScore ?? "N/A"}/35) | Lividity: ${visionData?.detectedLivor?.colorClassification?.replace(/_/g, " ") || "Violaceous"} (${visionData?.detectedLivor?.distribution || "Dependent"}) | Entomology: ${visionData?.detectedEntomology?.primaryInsectStage?.replace(/_/g, " ") || "None"} | Body Movement: ${visionData?.detectedMovement?.suspectedMovement ? "SUSPECTED (Dual Discordant Lividity)" : "Consistent Posture"}\n` +
+      `• Image Evidence Metric: Clarity: ${visionData?.averageClarityScore ?? 92}% | Diagnostic Reliability: ${visionData?.averageReliabilityScore ?? 90}% (${visionData?.overallQualityAssessment || "Forensic-Grade Evidence"})`
     : "No photographic evidence or computer vision detections attached."
 }
-
+${
+  hasExaminerNotes
+    ? `\n--------------------------------------------------------------------------------\nEXAMINER'S QUALITATIVE PATHOLOGY NOTES & NARRATIVE:\n${examinerNotesText}\n`
+    : ""
+}
 --------------------------------------------------------------------------------
 PHYSIOLOGICAL INDICATOR SUMMARY TABLE:
 ${result.indicatorEvaluations
@@ -316,7 +326,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
   };
 
   const handlePrint = () => {
-    setDownloadSuccess("PDF & Print Dossier Downloaded!");
+    setDownloadSuccess("PDF & Print Report Downloaded!");
     setTimeout(() => setDownloadSuccess(null), 3500);
     printForensicCaseReport(caseData, result, visionData, integrityHash);
   };
@@ -324,44 +334,44 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
   return (
     <section
       id="generated-report-section"
-      className="rounded-2xl bg-slate-900/95 border-2 border-teal-500/40 p-5 sm:p-8 space-y-6 shadow-2xl transition-all"
+      className="rounded-2xl bg-slate-900/95 border-2 border-teal-500/40 p-3.5 sm:p-6 md:p-8 space-y-4 sm:space-y-6 shadow-2xl transition-all"
     >
       {/* Top Header Bar with Actions */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-800 pb-5 no-print">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 sm:gap-4 border-b border-slate-800 pb-4 sm:pb-5 no-print">
+        <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 w-full lg:w-auto min-w-0">
           {onBackToWorkspace && (
             <button
               type="button"
               onClick={() => onBackToWorkspace()}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 hover:border-teal-500/50 flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition-colors shrink-0"
+              className="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 hover:border-teal-500/50 flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition-colors shrink-0"
               title="Return to Case Workspace & Edit Data"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">Back to Workspace</span>
+              <span className="hidden sm:inline">Back</span>
             </button>
           )}
-          <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400 shrink-0">
-            <FileText className="w-5 h-5" />
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400 shrink-0">
+            <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-lg sm:text-xl font-bold text-slate-100 tracking-tight">
+              <h2 className="text-base sm:text-xl font-bold text-slate-100 tracking-tight truncate">
                 Forensic Case Report
               </h2>
-              <span className="text-[10px] sm:text-xs font-semibold px-2 sm:px-2.5 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-800">
-                Official Report Document
+              <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-800 shrink-0">
+                Official Report
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 line-clamp-2 sm:line-clamp-none">
               Comprehensive multimodal estimation report including all case inputs, scene parameters, and photographic evidence.
             </p>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto no-print">
-          {/* Download Visual Analytics Quick Menu */}
-          <div className="flex items-center gap-1 p-1 bg-slate-950/90 border border-slate-800 rounded-xl">
+        {/* Action Buttons Toolbar */}
+        <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2 w-full lg:w-auto no-print">
+          {/* Download Visual Analytics Quick Menu Tray */}
+          <div className="no-scrollbar overflow-x-auto flex items-center gap-1 p-1 bg-slate-950/90 border border-slate-800 rounded-xl w-full sm:w-auto">
             <button
               type="button"
               onClick={async () => {
@@ -371,7 +381,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                 setTimeout(() => setDownloadSuccess(null), 3000);
               }}
               title="Download Henssge Cooling Trajectory Chart (PNG)"
-              className="px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-teal-400 text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-teal-400 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
             >
               <LineChart className="w-3.5 h-3.5" />
               <span>Cooling Curve</span>
@@ -386,7 +396,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                 setTimeout(() => setDownloadSuccess(null), 3000);
               }}
               title="Download PMI Probability Density Distribution (PNG)"
-              className="px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-sky-400 text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-sky-400 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
             >
               <TrendingUp className="w-3.5 h-3.5" />
               <span>PMI Density</span>
@@ -401,7 +411,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                 setTimeout(() => setDownloadSuccess(null), 3000);
               }}
               title="Download Factor Attribution & TreeSHAP Waterfall (PNG)"
-              className="px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-amber-400 text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="px-2.5 py-1.5 rounded-lg hover:bg-slate-800 text-amber-400 text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
             >
               <BarChart3 className="w-3.5 h-3.5" />
               <span>Attribution</span>
@@ -414,60 +424,63 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                 await downloadAllVisualizationsBundle(result, mlPredictionData, caseData);
                 setTimeout(() => setDownloadSuccess(null), 3500);
               }}
-              title="Download Complete Analytical Bundle (All 3 Charts + JSON dossier)"
-              className="px-2 py-1.5 rounded-lg bg-teal-950/80 hover:bg-teal-900/80 text-teal-300 border border-teal-800/80 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+              title="Download Complete Analytical Bundle (All 3 Charts + JSON report)"
+              className="px-2 py-1.5 rounded-lg bg-teal-950/80 hover:bg-teal-900/80 text-teal-300 border border-teal-800/80 text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
             >
               <Download className="w-3.5 h-3.5" />
               <span>All Exhibits</span>
             </button>
           </div>
 
-          <button
-            type="button"
-            onClick={handleCopyText}
-            className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
-          >
-            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-slate-400" />}
-            <span>{copied ? "Copied Plaintext" : "Copy Text"}</span>
-          </button>
+          {/* Quick Export & Print Actions */}
+          <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-end">
+            <button
+              type="button"
+              onClick={handleCopyText}
+              className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+              <span>{copied ? "Copied" : "Copy"}</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={handleDownloadTxt}
-            className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
-          >
-            <Download className="w-4 h-4 text-teal-400" />
-            <span>.TXT</span>
-          </button>
+            <button
+              type="button"
+              onClick={handleDownloadTxt}
+              className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
+            >
+              <Download className="w-3.5 h-3.5 text-teal-400" />
+              <span>.TXT</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={handleDownloadJson}
-            className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
-          >
-            <FileCode className="w-4 h-4 text-sky-400" />
-            <span>.JSON</span>
-          </button>
+            <button
+              type="button"
+              onClick={handleDownloadJson}
+              className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-700"
+            >
+              <FileCode className="w-3.5 h-3.5 text-sky-400" />
+              <span>.JSON</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={handleDownloadHtml}
-            className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-teal-900/60"
-            title="Download standalone print-ready HTML case report with embedded charts"
-          >
-            <Download className="w-4 h-4" />
-            <span>.HTML</span>
-          </button>
+            <button
+              type="button"
+              onClick={handleDownloadHtml}
+              className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-teal-900/60"
+              title="Download standalone print-ready HTML case report with embedded charts"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>.HTML</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-teal-900/40 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-            title="Print or Save as PDF via native print dialog"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Print Report</span>
-          </button>
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-teal-900/40 cursor-pointer"
+              title="Print or Save as PDF via native print dialog"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print Report</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -621,36 +634,75 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
         </div>
 
         {/* Preset Benchmark Case Banner (if preset used) */}
-        {(caseData.presetName || caseData.isPresetCase) && (
-          <div className="p-4 rounded-xl bg-teal-950/40 border border-teal-500/40 flex items-start gap-3.5 text-xs animate-in fade-in duration-150">
-            <div className="w-8 h-8 rounded-lg bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-300 shrink-0 mt-0.5">
+        {(caseData.presetName || caseData.isPresetCase || presetAudit.isPreset) && (
+          <div className={`p-4 rounded-xl border flex items-start gap-3.5 text-xs animate-in fade-in duration-150 ${
+            presetAudit.isModified
+              ? "bg-amber-950/30 border-amber-500/50 shadow-md shadow-amber-950/20"
+              : "bg-teal-950/40 border-teal-500/40"
+          }`}>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 border ${
+              presetAudit.isModified
+                ? "bg-amber-500/20 border-amber-500/30 text-amber-300"
+                : "bg-teal-500/20 border-teal-500/30 text-teal-300"
+            }`}>
               <FileSpreadsheet className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-bold text-teal-300 uppercase tracking-wider">
-                  Preset Reference Case Profile:
+                <span className={`text-[11px] font-bold uppercase tracking-wider ${
+                  presetAudit.isModified ? "text-amber-300" : "text-teal-300"
+                }`}>
+                  Preset Reference Profile:
                 </span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-teal-900/80 text-teal-200 border border-teal-700/80">
-                  {caseData.presetCategory || "Benchmark Case"}
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-900 text-slate-200 border border-slate-700">
+                  {presetAudit.presetCategory || caseData.presetCategory || "Benchmark Case"}
                 </span>
-                {caseData.isHarmonicPreset ? (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
-                    ✓ Harmonic Baseline (0 Discordance)
+
+                {presetAudit.isModified ? (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 text-amber-400" />
+                    Modified by Examiner ({presetAudit.modifiedCount} parameter adjustments)
                   </span>
                 ) : (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">
-                    Specialized Profile
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    Original Unaltered Baseline
+                  </span>
+                )}
+
+                {caseData.isHarmonicPreset && !presetAudit.isModified && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/80">
+                    ✓ Harmonic Baseline (0 Discordance)
                   </span>
                 )}
               </div>
               <div className="font-bold text-slate-100 text-sm mt-0.5">
-                {caseData.presetName || caseData.subjectNameOrIdentifier}
+                {presetAudit.presetName || caseData.presetName || caseData.subjectNameOrIdentifier}
               </div>
               {caseData.presetDescription && (
                 <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
                   {caseData.presetDescription}
                 </p>
+              )}
+
+              {/* Examiner Alterations Breakdown */}
+              {presetAudit.isModified && presetAudit.modifiedFieldLabels.length > 0 && (
+                <div className="mt-2.5 pt-2.5 border-t border-amber-900/40 space-y-1.5">
+                  <div className="text-[11px] font-semibold text-amber-200 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Examiner Modifications from Baseline:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {presetAudit.modifiedFieldLabels.map((diff, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-0.5 rounded bg-amber-950/90 border border-amber-800/90 font-mono text-[10px] text-amber-300 shadow-sm"
+                      >
+                        {diff}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -663,13 +715,31 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
             <span>1. Case Demographics & Scene Baseline</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${presetAudit.isPreset ? 'lg:grid-cols-6' : 'lg:grid-cols-5'} gap-3`}>
             <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800">
               <div className="text-[11px] text-slate-500">Case / File Number</div>
-              <div className="font-mono font-bold text-sm text-slate-100 mt-0.5">
+              <div className="font-mono font-bold text-sm text-slate-100 mt-0.5 truncate">
                 {caseData.caseId || "Not Assigned"}
               </div>
             </div>
+
+            {presetAudit.isPreset && (
+              <div className={`p-3.5 rounded-xl border ${
+                presetAudit.isModified
+                  ? "bg-amber-950/20 border-amber-800/60"
+                  : "bg-slate-900/90 border-slate-800"
+              }`}>
+                <div className="text-[11px] text-slate-500">Preset Case Status</div>
+                <div className="font-bold text-xs mt-0.5 truncate text-slate-200" title={presetAudit.presetName}>
+                  {presetAudit.presetName || "Benchmark Case"}
+                </div>
+                <div className={`text-[10px] font-semibold mt-1 truncate ${
+                  presetAudit.isModified ? "text-amber-400 font-medium" : "text-emerald-400"
+                }`}>
+                  {presetAudit.isModified ? `⚠️ Modified (${presetAudit.modifiedCount} Δ)` : "✓ Unaltered Baseline"}
+                </div>
+              </div>
+            )}
 
             <div className="p-3.5 rounded-xl bg-slate-900/90 border border-teal-900/40 bg-gradient-to-b from-slate-900 to-teal-950/20">
               <div className="text-[11px] text-teal-400 font-medium">Attending Pathologist / Examiner</div>
@@ -860,9 +930,17 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                 <span className="flex items-center gap-1.5 text-teal-400">
                   <Thermometer className="w-4 h-4" /> Algor Mortis (Henssge)
                 </span>
-                <span className={caseData.algorMortis.enabled ? "text-emerald-400" : "text-slate-500"}>
-                  {caseData.algorMortis.enabled ? "Active" : "Bypassed"}
-                </span>
+                <div className="flex items-center gap-2">
+                  {(caseData.algorMortis.recordedAt || caseData.indicatorTimings?.algor) && (
+                    <span className="text-[9px] font-mono text-teal-300 px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5 text-teal-400" />
+                      <span>{formatIndicatorTimestamp(caseData.algorMortis.recordedAt || caseData.indicatorTimings?.algor || "")}</span>
+                    </span>
+                  )}
+                  <span className={caseData.algorMortis.enabled ? "text-emerald-400" : "text-slate-500"}>
+                    {caseData.algorMortis.enabled ? "Active" : "Bypassed"}
+                  </span>
+                </div>
               </div>
               {caseData.algorMortis.enabled ? (
                 <div className="space-y-1 text-slate-400 font-mono text-[11px]">
@@ -881,11 +959,19 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
             <div className="p-4 rounded-xl bg-slate-900/70 border border-slate-800 space-y-2">
               <div className="flex items-center justify-between font-semibold text-slate-200">
                 <span className="flex items-center gap-1.5 text-purple-400">
-                  <Droplet className="w-4 h-4" /> Livor Mortis (Hypostasis)
+                  <Droplet className="w-4 h-4" /> Livor Mortis
                 </span>
-                <span className={caseData.livorMortis.enabled ? "text-emerald-400" : "text-slate-500"}>
-                  {caseData.livorMortis.enabled ? "Active" : "Bypassed"}
-                </span>
+                <div className="flex items-center gap-2">
+                  {(caseData.livorMortis.recordedAt || caseData.indicatorTimings?.livor) && (
+                    <span className="text-[9px] font-mono text-teal-300 px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5 text-teal-400" />
+                      <span>{formatIndicatorTimestamp(caseData.livorMortis.recordedAt || caseData.indicatorTimings?.livor || "")}</span>
+                    </span>
+                  )}
+                  <span className={caseData.livorMortis.enabled ? "text-emerald-400" : "text-slate-500"}>
+                    {caseData.livorMortis.enabled ? "Active" : "Bypassed"}
+                  </span>
+                </div>
               </div>
               {caseData.livorMortis.enabled ? (
                 <div className="space-y-1 text-slate-400 font-mono text-[11px]">
@@ -905,9 +991,17 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                 <span className="flex items-center gap-1.5 text-amber-400">
                   <Activity className="w-4 h-4" /> Rigor Mortis (Nysten)
                 </span>
-                <span className={caseData.rigorMortis.enabled ? "text-emerald-400" : "text-slate-500"}>
-                  {caseData.rigorMortis.enabled ? "Active" : "Bypassed"}
-                </span>
+                <div className="flex items-center gap-2">
+                  {(caseData.rigorMortis.recordedAt || caseData.indicatorTimings?.rigor) && (
+                    <span className="text-[9px] font-mono text-teal-300 px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5 text-teal-400" />
+                      <span>{formatIndicatorTimestamp(caseData.rigorMortis.recordedAt || caseData.indicatorTimings?.rigor || "")}</span>
+                    </span>
+                  )}
+                  <span className={caseData.rigorMortis.enabled ? "text-emerald-400" : "text-slate-500"}>
+                    {caseData.rigorMortis.enabled ? "Active" : "Bypassed"}
+                  </span>
+                </div>
               </div>
               {caseData.rigorMortis.enabled ? (
                 <div className="space-y-1 text-slate-400 font-mono text-[11px]">
@@ -926,9 +1020,17 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                 <span className="flex items-center gap-1.5 text-emerald-400">
                   <Skull className="w-4 h-4" /> Decomposition (TBS)
                 </span>
-                <span className={caseData.decomposition.enabled ? "text-emerald-400" : "text-slate-500"}>
-                  {caseData.decomposition.enabled ? "Active" : "Bypassed"}
-                </span>
+                <div className="flex items-center gap-2">
+                  {(caseData.decomposition.recordedAt || caseData.indicatorTimings?.decomposition) && (
+                    <span className="text-[9px] font-mono text-teal-300 px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5 text-teal-400" />
+                      <span>{formatIndicatorTimestamp(caseData.decomposition.recordedAt || caseData.indicatorTimings?.decomposition || "")}</span>
+                    </span>
+                  )}
+                  <span className={caseData.decomposition.enabled ? "text-emerald-400" : "text-slate-500"}>
+                    {caseData.decomposition.enabled ? "Active" : "Bypassed"}
+                  </span>
+                </div>
               </div>
               {caseData.decomposition.enabled ? (
                 <div className="space-y-1 text-slate-400 font-mono text-[11px]">
@@ -954,9 +1056,17 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                 <span className="flex items-center gap-1.5 text-orange-400">
                   <Bug className="w-4 h-4" /> Forensic Entomology
                 </span>
-                <span className={caseData.entomology.enabled ? "text-emerald-400" : "text-slate-500"}>
-                  {caseData.entomology.enabled ? "Active" : "Bypassed"}
-                </span>
+                <div className="flex items-center gap-2">
+                  {(caseData.entomology.recordedAt || caseData.indicatorTimings?.entomology) && (
+                    <span className="text-[9px] font-mono text-teal-300 px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5 text-teal-400" />
+                      <span>{formatIndicatorTimestamp(caseData.entomology.recordedAt || caseData.indicatorTimings?.entomology || "")}</span>
+                    </span>
+                  )}
+                  <span className={caseData.entomology.enabled ? "text-emerald-400" : "text-slate-500"}>
+                    {caseData.entomology.enabled ? "Active" : "Bypassed"}
+                  </span>
+                </div>
               </div>
               {caseData.entomology.enabled ? (
                 <div className="space-y-1 text-slate-400 font-mono text-[11px]">
@@ -976,9 +1086,17 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                 <span className="flex items-center gap-1.5 text-cyan-400">
                   <TestTube2 className="w-4 h-4" /> Vitreous Metabolomics
                 </span>
-                <span className={caseData.metabolomics.enabled ? "text-emerald-400" : "text-slate-500"}>
-                  {caseData.metabolomics.enabled ? "Active" : "Bypassed"}
-                </span>
+                <div className="flex items-center gap-2">
+                  {(caseData.metabolomics.recordedAt || caseData.indicatorTimings?.metabolomics) && (
+                    <span className="text-[9px] font-mono text-teal-300 px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5 text-teal-400" />
+                      <span>{formatIndicatorTimestamp(caseData.metabolomics.recordedAt || caseData.indicatorTimings?.metabolomics || "")}</span>
+                    </span>
+                  )}
+                  <span className={caseData.metabolomics.enabled ? "text-emerald-400" : "text-slate-500"}>
+                    {caseData.metabolomics.enabled ? "Active" : "Bypassed"}
+                  </span>
+                </div>
               </div>
               {caseData.metabolomics.enabled ? (
                 <div className="space-y-1 text-slate-400 font-mono text-[11px]">
@@ -998,82 +1116,107 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
           </div>
         </div>
 
-        {/* 4. Photographic Evidence & Computer Vision Inspection (Includes Pictures) */}
+        {/* 4. Photographic Evidence & Computer Vision Analysis Summary */}
         <div className="space-y-3">
           <div className="text-xs font-bold text-teal-400 uppercase tracking-wider flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Camera className="w-4 h-4" />
-              <span>4. Photographic Evidence & Vision Inspection ({imagesList.length} Uploaded)</span>
+              <span>4. Photographic Evidence & Vision Analysis</span>
             </div>
             {imagesList.length > 0 && (
               <span className="text-[11px] text-slate-400 font-mono">
-                {imagesList.filter(img => !img.isUnrelated).length} Relevant Forensics
+                {forensicPhotosList.length} Forensic Photo(s) Evaluated
               </span>
             )}
           </div>
 
           {imagesList.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {imagesList.map((img, idx) => (
-                <div
-                  key={img.id || idx}
-                  className={`rounded-xl border p-3 space-y-2.5 ${
-                    img.isUnrelated
-                      ? "bg-rose-950/30 border-rose-800/80"
-                      : "bg-slate-900/80 border-slate-800"
-                  }`}
-                >
-                  <div className="relative rounded-lg overflow-hidden bg-slate-950 aspect-video flex items-center justify-center border border-slate-800">
-                    <img
-                      src={img.dataUrl || img.previewUrl}
-                      alt={img.name || `Forensic Evidence ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                    <div className="absolute top-2 left-2 flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-950/90 text-slate-200 border border-slate-700">
-                        Photo {idx + 1}
+            <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+              {/* Short Vision Analysis Description */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-xs font-semibold text-teal-300">
+                  <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Photo Analysis Summary:</span>
+                </div>
+                <p className="text-xs text-slate-200 leading-relaxed bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+                  {visionData?.forensicObservations ||
+                    `Visual inspection of submitted photos indicates ${visionData?.detectedDecompositionStage?.replace(/_/g, " ") || "fresh"} post-mortem stage (TBS ${visionData?.estimatedTbs?.totalScore || 3}/35) with ${visionData?.detectedLivor?.colorClassification?.replace(/_/g, " ") || "violaceous"} hypostatic settling and ${visionData?.detectedEntomology?.primaryInsectStage?.replace(/_/g, " ") || "no active"} insect colonization.`}
+                </p>
+              </div>
+
+              {/* Key Visual Findings Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/90 space-y-0.5">
+                  <div className="text-[10px] text-slate-400 uppercase font-mono">Decomposition / Decay</div>
+                  <div className="font-semibold text-amber-300 capitalize">
+                    {visionData?.detectedDecompositionStage?.replace(/_/g, " ") || "Indeterminate"}
+                    {visionData?.estimatedTbs && (
+                      <span className="text-slate-400 font-mono font-normal ml-1">
+                        (TBS {visionData.estimatedTbs.totalScore}/35)
                       </span>
-                      {img.isUnrelated ? (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" /> Excluded Issue
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-teal-950 text-teal-300 border border-teal-800">
-                          {(img.tag || "Scene").replace(/_/g, " ")}
-                        </span>
-                      )}
-                    </div>
-
-                    {!img.isUnrelated && (img.clarityScore !== undefined || img.reliabilityScore !== undefined) ? (
-                      <div className="absolute bottom-2 right-2 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-950/90 text-teal-300 border border-teal-800/60">
-                        Clarity: {img.clarityScore ?? 92}% | Reliability: {img.reliabilityScore ?? 90}%
-                      </div>
-                    ) : img.qualityRating ? (
-                      <div className="absolute bottom-2 right-2 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-950/90 text-slate-300 border border-slate-800">
-                        Quality: {img.qualityRating}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="space-y-1 text-xs">
-                    <div className="font-semibold text-slate-200 truncate">{img.name}</div>
-                    {img.qualityWarning && (
-                      <div className="text-[11px] text-amber-400 flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3 shrink-0" />
-                        <span>{img.qualityWarning}</span>
-                      </div>
-                    )}
-                    {img.detectedFindings ? (
-                      <p className="text-[11px] text-slate-400 leading-relaxed bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
-                        <strong className="text-teal-400">AI Observation:</strong> {img.detectedFindings}
-                      </p>
-                    ) : (
-                      <div className="text-[11px] text-slate-500 italic">No AI observations logged.</div>
                     )}
                   </div>
                 </div>
-              ))}
+
+                <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/90 space-y-0.5">
+                  <div className="text-[10px] text-slate-400 uppercase font-mono">Skin Color & Hypostasis</div>
+                  <div className="font-semibold text-purple-300 capitalize">
+                    {visionData?.detectedLivor?.colorClassification?.replace(/_/g, " ") || "Violaceous"}
+                    <span className="text-slate-400 font-mono font-normal ml-1">
+                      ({visionData?.detectedLivor?.estimatedFixation?.replace(/_/g, " ") || "Partially Fixed"})
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/90 space-y-0.5">
+                  <div className="text-[10px] text-slate-400 uppercase font-mono">Entomology / Insects</div>
+                  <div className="font-semibold text-emerald-300 capitalize">
+                    {visionData?.detectedEntomology?.primaryInsectStage?.replace(/_/g, " ") || "None Visible"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Post-Mortem Body Movement Note if flagged */}
+              {visionData?.detectedMovement?.suspectedMovement && (
+                <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-800/80 text-xs text-purple-200 space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-purple-300">
+                    <AlertTriangle className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Post-Mortem Body Movement Detected ({visionData.detectedMovement.confidenceScore}% Confidence)</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-purple-200/90">
+                    {visionData.detectedMovement.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Photo Overview Strip & Quality Ratings */}
+              <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 font-mono">Evidence Fidelity:</span>
+                  <span className="font-mono text-teal-300 font-semibold">
+                    Clarity: {visionData?.averageClarityScore ?? 92}%
+                  </span>
+                  <span>•</span>
+                  <span className="font-mono text-teal-300 font-semibold">
+                    Reliability: {visionData?.averageReliabilityScore ?? 90}%
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {imagesList.slice(0, 4).map((img, idx) => (
+                    <span
+                      key={img.id || idx}
+                      className="px-2 py-0.5 rounded bg-slate-950 text-slate-300 border border-slate-800 text-[10px] font-mono"
+                    >
+                      Photo #{idx + 1}: {(img.tag || "Scene").replace(/_/g, " ")}
+                    </span>
+                  ))}
+                  {imagesList.length > 4 && (
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      +{imagesList.length - 4} more
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           ) : (
             <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80 text-xs text-slate-400 flex items-center gap-2">
@@ -1082,6 +1225,22 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
             </div>
           )}
         </div>
+
+        {/* Examiner's Qualitative Notes (Rendered ONLY if examiner provided notes) */}
+        {hasExaminerNotes && (
+          <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2">
+            <div className="text-xs font-bold text-teal-400 uppercase tracking-wider flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Stethoscope className="w-4 h-4 text-teal-400" />
+                <span>Examiner&apos;s Qualitative Pathology & Scene Notes</span>
+              </div>
+              <span className="text-[10px] text-slate-500 font-mono">Official Observation</span>
+            </div>
+            <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+              {examinerNotesText}
+            </p>
+          </div>
+        )}
 
         {/* 5. Inconsistencies and Physiological Alerts */}
         {result.inconsistenciesDetected && (

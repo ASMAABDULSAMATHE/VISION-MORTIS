@@ -65,6 +65,8 @@ export interface CaseMetadata {
   bodyWeightKg: number;
   notes: string;
   examinersNotes?: string;
+  recordedAt?: string;
+  lastModifiedAt?: string;
 }
 
 export interface AlgorMortisData {
@@ -76,6 +78,7 @@ export interface AlgorMortisData {
   clothingDescription: string;
   isBodyWet: boolean;
   airCurrentVelocity: "still" | "moderate_breeze" | "strong_wind";
+  recordedAt?: string; // Timing of examiner indicator observation/entry
 }
 
 export interface LivorMortisData {
@@ -86,6 +89,7 @@ export interface LivorMortisData {
   lividityPositionFound: BodyPosition;
   suspectedBodyMovement: boolean;
   notes: string;
+  recordedAt?: string; // Timing of examiner indicator observation/entry
 }
 
 export interface RigorMortisData {
@@ -100,6 +104,7 @@ export interface RigorMortisData {
   };
   preDeathPhysicalExertion: "none_at_rest" | "moderate" | "violent_convulsions_strenuous";
   coldStiffeningSuspected: boolean;
+  recordedAt?: string; // Timing of examiner indicator observation/entry
 }
 
 export interface DecompositionData {
@@ -115,6 +120,7 @@ export interface DecompositionData {
   mummificationOrAdipocere: boolean;
   skeletonizationBoneExposed: boolean;
   effectiveMeanTempC: number;
+  recordedAt?: string; // Timing of examiner indicator observation/entry
 }
 
 export interface EntomologyData {
@@ -126,6 +132,7 @@ export interface EntomologyData {
   indoorAccessDelayHours: number; // e.g. closed windows delay fly arrival
   speciesName?: string;
   calculatedAdh?: number;
+  recordedAt?: string; // Timing of examiner indicator observation/entry
 }
 
 export interface ActiveMetaboliteItem {
@@ -146,9 +153,11 @@ export interface MetabolomicsData {
   vitreousHypoxanthineUmolL?: number;
   vitreousLactateMmolL?: number;
   ureaNitrogenMgDl?: number;
+  vitreousSodiumMmolL?: number;
   selectedMetabolites?: ActiveMetaboliteItem[];
   sampleCollectionDateTime?: string;
   suspectedRenalFailureOrTrauma: boolean;
+  recordedAt?: string; // Timing of examiner indicator observation/entry
 }
 
 export type RelevanceCategoryType =
@@ -291,6 +300,8 @@ export interface VisionDetectionData {
   examinerNotes?: string;
   investigatorNotes?: string;
   qualityWarning?: string | null;
+  analyzedAt?: string;
+  recordedAt?: string;
   perImageFindings?: Array<{
     imageId: string;
     tag: string;
@@ -409,6 +420,8 @@ export interface ForensicCaseInput {
   presetDescription?: string;
   isPresetCase?: boolean;
   isHarmonicPreset?: boolean;
+  isPresetModified?: boolean;
+  presetModifiedAt?: string;
   ageYears?: number;
   sex: "male" | "female" | "unknown";
   discoveryTimestamp: string;
@@ -417,6 +430,7 @@ export interface ForensicCaseInput {
   examinerName?: string;
   jurisdiction?: string;
   ambientTempC: number;
+  relativeHumidityPercent?: number;
   bodyWeightKg: number;
   bodyFoundPosition: BodyPosition;
   algorMortis: AlgorMortisData;
@@ -426,5 +440,18 @@ export interface ForensicCaseInput {
   entomology: EntomologyData;
   metabolomics: MetabolomicsData;
   examinersNotes?: string;
+  indicatorTimings?: {
+    sceneBaseline?: string;
+    algor?: string;
+    livor?: string;
+    rigor?: string;
+    decomposition?: string;
+    entomology?: string;
+    metabolomics?: string;
+    vision?: string;
+    [key: string]: string | undefined;
+  };
+  examinationStartedAt?: string;
+  lastModifiedAt?: string;
 }
 

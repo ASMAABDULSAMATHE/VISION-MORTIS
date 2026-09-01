@@ -215,27 +215,27 @@ export const MainSidePanel: React.FC<Props> = ({
                   {
                     step: "1",
                     title: "Scene & Environmental Baseline",
-                    desc: "Set the case ID, date/time of discovery, ambient temperature at the scene, and estimated body weight. These baseline metrics calibrate all cooling and decomposition models.",
+                    desc: "Set the case identifier, discovery timestamp, ambient temperature, relative humidity, and body weight. Ambient temperature and body mass automatically synchronize across cooling, decomposition, and entomology models.",
                   },
                   {
                     step: "2",
                     title: "Early Indicators (0 to 24 Hours)",
-                    desc: "Enter core rectal temperature and clothing coverage (Algor Mortis), check lividity blanchability and color (Livor Mortis), and assess muscle stiffness progression (Rigor Mortis).",
+                    desc: "Enter core rectal temperature and clothing coverage (Algor Mortis Henssge nomogram), assess lividity distribution and blanching response (Livor Mortis), and evaluate muscle rigidity progression or cold stiffening (Rigor Mortis).",
                   },
                   {
                     step: "3",
                     title: "Extended Markers (Days to Weeks)",
-                    desc: "For decomposing remains, record Total Body Score for head, trunk, and limbs (Decomposition), inspect insect instars (Entomology), or enter vitreous potassium levels.",
+                    desc: "For advanced post-mortem intervals, score regional anatomical decomposition (Megyesi Total Body Score & ADD), record dipteran developmental instars (Entomology ADH), or measure vitreous potassium and co-analyte concentrations.",
                   },
                   {
                     step: "4",
                     title: "Computer Vision Analysis (Optional)",
-                    desc: "Upload scene or autopsy images. Vision AI inspects decomposition stages and lividity hues, allowing you to sync findings directly to the form with one click.",
+                    desc: "Upload scene or autopsy photos for automated quality grading, issue filtering, and decomposition/lividity classification. Review morphological assessments and apply findings directly into the case calculator with one click.",
                   },
                   {
                     step: "5",
-                    title: "Review Results & Export Report",
-                    desc: "Inspect the final PMI range, check any inconsistency warnings, review factor attributions, and print or copy a standardized medico-legal case report.",
+                    title: "Review Results & Export Case Report",
+                    desc: "Examine the composite time-of-death window, investigate any physiological conflict alerts (e.g. post-mortem body relocation), explore TreeSHAP machine learning factor contributions, and export a courtroom-ready Medico-Legal Forensic Case Report (PDF, High-Res Charts, and JSON).",
                   },
                 ].map((item) => (
                   <div
@@ -255,6 +255,25 @@ export const MainSidePanel: React.FC<Props> = ({
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Best Practices Box */}
+              <div className="p-4 rounded-xl bg-slate-950/50 border border-teal-900/40 space-y-2">
+                <h4 className="text-xs font-bold text-teal-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
+                  Forensic Best Practices &amp; Dynamic Sync
+                </h4>
+                <ul className="text-xs text-slate-400 space-y-1.5 list-disc pl-4 leading-relaxed">
+                  <li>
+                    <strong className="text-slate-300">Preset Case Scenarios:</strong> Use the top benchmark presets to quickly simulate fresh AC indoor scenes, intermediate cases, hot arid decay, body relocation conflicts, or cold-room storage.
+                  </li>
+                  <li>
+                    <strong className="text-slate-300">Automatic Cross-Parameter Sync:</strong> Adjusting ambient temperature or body mass updates all dependent biological formulas in real time.
+                  </li>
+                  <li>
+                    <strong className="text-slate-300">Inconsistency Diagnostics:</strong> If livor distribution conflicts with body found position or if freezing temperatures cause cold stiffening, the system flags explicit diagnostic warnings rather than averaging contradictory numbers blindly.
+                  </li>
+                </ul>
               </div>
             </div>
           )}
@@ -283,7 +302,7 @@ export const MainSidePanel: React.FC<Props> = ({
                   },
                   {
                     icon: Droplet,
-                    name: "Livor Mortis (Hypostasis)",
+                    name: "Livor Mortis",
                     window: "30 min – 12 Hours",
                     model: "Intravascular pooling & capillary fixation",
                     confounders: "Severe blood loss, dark pigmentation, CO/cyanide poisoning.",

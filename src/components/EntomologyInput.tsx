@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { EntomologyData, EntomologyInsectStage } from "../types";
 import { evaluateEntomology } from "../utils/forensicCalculations";
+import { formatIndicatorTimestamp } from "../utils/validation";
 import {
   Bug,
   Info,
@@ -9,6 +10,7 @@ import {
   ChevronDown,
   ChevronUp,
   HelpCircle,
+  Clock,
 } from "lucide-react";
 
 interface Props {
@@ -129,11 +131,17 @@ export const EntomologyInput: React.FC<Props> = ({
             <Bug className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-slate-100 flex items-center gap-2">
-              Forensic Entomology
+            <h3 className="text-base font-semibold text-slate-100 flex items-center gap-2 flex-wrap">
+              <span>Forensic Entomology</span>
               <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-teal-950/80 text-teal-400 border border-teal-800/50">
                 Days – Months
               </span>
+              {data.recordedAt && (
+                <span className="text-[10px] font-mono text-teal-300 px-2 py-0.5 rounded-md bg-slate-950/90 border border-slate-800 flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-teal-400" />
+                  <span>Logged: {formatIndicatorTimestamp(data.recordedAt)}</span>
+                </span>
+              )}
             </h3>
             <p className="text-xs text-slate-400">Diptera & Coleoptera succession, larval instar development & Accumulated Degree Hours (ADH)</p>
           </div>

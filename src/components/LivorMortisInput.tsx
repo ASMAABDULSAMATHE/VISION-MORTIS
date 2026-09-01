@@ -8,8 +8,10 @@ import {
   ChevronDown,
   ChevronUp,
   HelpCircle,
+  Clock,
 } from "lucide-react";
 import { evaluateLivorMortis } from "../utils/forensicCalculations";
+import { formatIndicatorTimestamp } from "../utils/validation";
 
 interface Props {
   data: LivorMortisData;
@@ -124,11 +126,17 @@ export const LivorMortisInput: React.FC<Props> = ({
             <Droplet className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-slate-100 flex items-center gap-2">
-              Livor Mortis (Hypostasis)
+            <h3 className="text-base font-semibold text-slate-100 flex items-center gap-2 flex-wrap">
+              <span>Livor Mortis</span>
               <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-teal-950/80 text-teal-400 border border-teal-800/50">
                 30 min – 12 Hours
               </span>
+              {data.recordedAt && (
+                <span className="text-[10px] font-mono text-teal-300 px-2 py-0.5 rounded-md bg-slate-950/90 border border-slate-800 flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-teal-400" />
+                  <span>Logged: {formatIndicatorTimestamp(data.recordedAt)}</span>
+                </span>
+              )}
             </h3>
             <p className="text-xs text-slate-400">Post-mortem gravitational settling of blood and fixation timeline</p>
           </div>

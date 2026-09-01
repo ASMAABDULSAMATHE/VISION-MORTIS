@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect } from "react";
 import { ForensicCaseInput, VisionDetectionData } from "./types";
 import { FORENSIC_PRESETS } from "./data/forensicPresets";
 import { calculateCompositePmi } from "./utils/forensicCalculations";
-import { validateCaseId, generateValidCaseId } from "./utils/validation";
+import { validateCaseId, generateValidCaseId, getFormattedCurrentTimestamp, formatIndicatorTimestamp } from "./utils/validation";
+import { auditPresetModifications } from "./utils/presetAudit";
 import { RecreatedLogo } from "./components/RecreatedLogo";
 import { AlgorMortisInput } from "./components/AlgorMortisInput";
 import { LivorMortisInput } from "./components/LivorMortisInput";
@@ -20,6 +21,7 @@ import { GeneratedReportSection } from "./components/GeneratedReportSection";
 import {
   Thermometer,
   Droplet,
+  Droplets,
   Activity,
   Skull,
   Bug,
@@ -105,6 +107,23 @@ export default function App() {
     return res;
   }, [caseData, aiSynthesisData]);
 
+  // Audit preset modifications made by examiner
+  const presetAudit = useMemo(() => {
+    return auditPresetModifications(caseData);
+  }, [caseData]);
+
+  // Derived baseline comparisons for examiner modifications
+  const baseline = presetAudit.baseline;
+  const isTempModified = !!(baseline && caseData.ambientTempC !== baseline.ambientTempC);
+  const baseTemp = baseline?.ambientTempC;
+
+  const currentHumidity = caseData.relativeHumidityPercent ?? 50;
+  const baseHumidity = baseline ? (baseline.relativeHumidityPercent ?? 50) : 50;
+  const isHumidityModified = !!(baseline && currentHumidity !== baseHumidity);
+
+  const isWeightModified = !!(baseline && caseData.bodyWeightKg !== baseline.bodyWeightKg);
+  const baseWeight = baseline?.bodyWeightKg;
+
   // Reset to pure empty blank template (everything cleared)
   const handleResetBlank = () => {
     setCaseData({
@@ -116,6 +135,7 @@ export default function App() {
       locationDescription: "",
       investigatorName: "",
       ambientTempC: 20.0,
+      relativeHumidityPercent: 50,
       bodyWeightKg: 70,
       bodyFoundPosition: "supine",
       algorMortis: {
@@ -293,7 +313,7 @@ export default function App() {
 
     const updated = { ...caseData };
 
-    if (vData.estimatedTbs && !vData.unrelatedImagesDetected) {
+    if (vData.estimatedTbs && validForensic.length > 0) {
       updated.decomposition = {
         ...updated.decomposition,
         enabled: true,
@@ -306,7 +326,7 @@ export default function App() {
       };
     }
 
-    if (vData.detectedLivor?.colorClassification && !vData.unrelatedImagesDetected) {
+    if (vData.detectedLivor?.colorClassification && validForensic.length > 0) {
       updated.livorMortis = {
         ...updated.livorMortis,
         enabled: true,
@@ -315,7 +335,7 @@ export default function App() {
       };
     }
 
-    if (vData.detectedEntomology?.insectsPresent && vData.detectedEntomology.primaryInsectStage && !vData.unrelatedImagesDetected) {
+    if (vData.detectedEntomology?.insectsPresent && vData.detectedEntomology.primaryInsectStage && validForensic.length > 0) {
       updated.entomology = {
         ...updated.entomology,
         enabled: true,
@@ -334,7 +354,65 @@ export default function App() {
       }
     }
 
+    const currentNow = getFormattedCurrentTimestamp();
+    updated.indicatorTimings = {
+      ...(updated.indicatorTimings || {}),
+      vision: currentNow,
+      ...(vData.estimatedTbs ? { decomposition: currentNow } : {}),
+      ...(vData.detectedLivor ? { livor: currentNow } : {}),
+      ...(vData.detectedEntomology ? { entomology: currentNow } : {}),
+    };
+    updated.lastModifiedAt = currentNow;
+
     setCaseData(updated);
+  };
+
+  const updateIndicatorModule = <
+    K extends "algorMortis" | "livorMortis" | "rigorMortis" | "decomposition" | "entomology" | "metabolomics"
+  >(
+    key: K,
+    updatedModuleData: ForensicCaseInput[K]
+  ) => {
+    const now = getFormattedCurrentTimestamp();
+    const dataWithTime = {
+      ...updatedModuleData,
+      recordedAt: now,
+    };
+    const timingKey =
+      key === "algorMortis"
+        ? "algor"
+        : key === "livorMortis"
+        ? "livor"
+        : key === "rigorMortis"
+        ? "rigor"
+        : key === "decomposition"
+        ? "decomposition"
+        : key === "entomology"
+        ? "entomology"
+        : "metabolomics";
+
+    setCaseData((prev) => {
+      const newAmbient =
+        key === "algorMortis" && (updatedModuleData as any).ambientTempC !== undefined
+          ? (updatedModuleData as any).ambientTempC
+          : prev.ambientTempC;
+      const newWeight =
+        key === "algorMortis" && (updatedModuleData as any).bodyWeightKg !== undefined
+          ? (updatedModuleData as any).bodyWeightKg
+          : prev.bodyWeightKg;
+
+      return {
+        ...prev,
+        ambientTempC: newAmbient,
+        bodyWeightKg: newWeight,
+        [key]: dataWithTime,
+        indicatorTimings: {
+          ...(prev.indicatorTimings || {}),
+          [timingKey]: now,
+        },
+        lastModifiedAt: now,
+      };
+    });
   };
 
   const openSidePanel = (section: "about" | "xgboost" | "guide" | "limitations" | "indicators") => {
@@ -373,7 +451,7 @@ export default function App() {
       label: "1. Scene & Environment",
       icon: Compass,
       status: "ready",
-      badge: `${caseData.ambientTempC}°C / ${caseData.bodyWeightKg}kg`,
+      badge: `${caseData.ambientTempC}°C / ${caseData.relativeHumidityPercent ?? 50}% RH / ${caseData.bodyWeightKg}kg`,
     },
     {
       id: "vision",
@@ -669,11 +747,29 @@ export default function App() {
 
               {/* Sidebar Quick Case Preset Switcher */}
               <div className="pt-2 border-t border-slate-800/60 space-y-1.5">
-                <div className="flex items-center">
+                <div className="flex items-center justify-between">
                   <label className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
                     <FileSpreadsheet className="w-3 h-3 text-teal-400" />
                     <span>Preset Case:</span>
                   </label>
+                  {presetAudit.isPreset && presetAudit.isModified && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const orig = FORENSIC_PRESETS.find(
+                          (p) => (caseData.presetId && p.presetId === caseData.presetId) || p.caseId === caseData.caseId
+                        );
+                        if (orig) {
+                          setCaseData(orig);
+                          setAiSynthesisData(null);
+                        }
+                      }}
+                      className="text-[9px] text-amber-300 hover:text-white underline cursor-pointer"
+                      title="Revert modifications to original preset baseline"
+                    >
+                      Revert Baseline
+                    </button>
+                  )}
                 </div>
                 {(() => {
                   const activePresetIdx = FORENSIC_PRESETS.findIndex(
@@ -699,10 +795,26 @@ export default function App() {
                           </option>
                         ))}
                       </select>
-                      {activePresetIdx >= 0 && (
-                        <div className="text-[10px] text-teal-300 font-medium truncate flex items-center gap-1 mt-0.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
-                          <span className="truncate">Selected: {FORENSIC_PRESETS[activePresetIdx].presetCategory}</span>
+
+                      {/* Preset Modification Status Badge in Sidebar */}
+                      {presetAudit.isPreset && (
+                        <div className="mt-1">
+                          {presetAudit.isModified ? (
+                            <div className="p-1.5 rounded-lg bg-amber-950/60 border border-amber-800/80 text-[10px] space-y-0.5">
+                              <div className="text-amber-300 font-bold flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                                <span>Modified by Examiner ({presetAudit.modifiedCount} Δ)</span>
+                              </div>
+                              <div className="text-amber-200/80 text-[9px] truncate" title={presetAudit.modifiedFieldLabels.join(", ")}>
+                                {presetAudit.modifiedFieldLabels.slice(0, 2).join(", ")}{presetAudit.modifiedFieldLabels.length > 2 ? "..." : ""}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-emerald-400 font-medium truncate flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                              <span className="truncate">Original: {FORENSIC_PRESETS[activePresetIdx]?.presetCategory || "Benchmark"}</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </>
@@ -896,6 +1008,18 @@ export default function App() {
                   </div>
                 </div>
 
+                {presetAudit.isModified && (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-950/60 border border-amber-800/80 text-amber-300 text-xs w-full sm:w-auto">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span className="font-semibold">
+                      {presetAudit.modifiedCount} Examiner Change{presetAudit.modifiedCount !== 1 ? "s" : ""} Active:
+                    </span>
+                    <span className="text-amber-200/90 font-mono text-[11px] truncate max-w-[220px] lg:max-w-xs" title={presetAudit.modifiedFieldLabels.join("; ")}>
+                      {presetAudit.modifiedFieldLabels.join(", ")}
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                   <button
                     type="button"
@@ -935,38 +1059,90 @@ export default function App() {
               </div>
 
               {/* Quick Case Presets Loader - Fully Responsive Container */}
-              <div className="w-full lg:w-auto min-w-0 flex flex-col sm:flex-row sm:items-center gap-2 bg-slate-950/70 lg:bg-transparent p-2.5 lg:p-0 rounded-xl border lg:border-0 border-slate-800/80">
-                <div className="flex items-center gap-1.5 text-slate-400 text-xs font-medium shrink-0">
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-teal-400" />
-                  <span className="text-[11px] font-semibold text-slate-300">Case Preset:</span>
+              <div className="w-full lg:w-auto min-w-0 flex flex-col gap-2 bg-slate-950/70 lg:bg-transparent p-2.5 lg:p-0 rounded-xl border lg:border-0 border-slate-800/80">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div className="flex items-center gap-1.5 text-slate-400 text-xs font-medium shrink-0">
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-teal-400" />
+                    <span className="text-[11px] font-semibold text-slate-300">Case Preset:</span>
+                  </div>
+                  <div className="relative min-w-0 flex-1 w-full sm:w-auto">
+                    {(() => {
+                      const activePresetIdx = FORENSIC_PRESETS.findIndex(
+                        (p) => (caseData.presetId && p.presetId === caseData.presetId) || p.caseId === caseData.caseId
+                      );
+                      return (
+                        <select
+                          value={activePresetIdx >= 0 ? activePresetIdx : ""}
+                          onChange={(e) => {
+                            const idx = parseInt(e.target.value, 10);
+                            if (!isNaN(idx) && FORENSIC_PRESETS[idx]) {
+                              setCaseData(FORENSIC_PRESETS[idx]);
+                              setAiSynthesisData(null);
+                            }
+                          }}
+                          className="w-full lg:w-72 max-w-full truncate bg-slate-900 lg:bg-slate-950 border border-slate-700/80 hover:border-teal-500/80 rounded-xl px-2.5 py-1.5 text-xs text-teal-300 focus:outline-none focus:border-teal-400 cursor-pointer shadow-sm"
+                        >
+                          <option value="" disabled>Load benchmark case...</option>
+                          {FORENSIC_PRESETS.map((preset, idx) => (
+                            <option key={preset.presetId || preset.caseId || idx} value={idx}>
+                              {preset.presetName || `${preset.caseId}: ${preset.subjectNameOrIdentifier}`}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
+                  </div>
                 </div>
-                <div className="relative min-w-0 flex-1 w-full sm:w-auto">
-                  {(() => {
-                    const activePresetIdx = FORENSIC_PRESETS.findIndex(
-                      (p) => (caseData.presetId && p.presetId === caseData.presetId) || p.caseId === caseData.caseId
-                    );
-                    return (
-                      <select
-                        value={activePresetIdx >= 0 ? activePresetIdx : ""}
-                        onChange={(e) => {
-                          const idx = parseInt(e.target.value, 10);
-                          if (!isNaN(idx) && FORENSIC_PRESETS[idx]) {
-                            setCaseData(FORENSIC_PRESETS[idx]);
-                            setAiSynthesisData(null);
-                          }
-                        }}
-                        className="w-full lg:w-72 max-w-full truncate bg-slate-900 lg:bg-slate-950 border border-slate-700/80 hover:border-teal-500/80 rounded-xl px-2.5 py-1.5 text-xs text-teal-300 focus:outline-none focus:border-teal-400 cursor-pointer shadow-sm"
-                      >
-                        <option value="" disabled>Load benchmark case...</option>
-                        {FORENSIC_PRESETS.map((preset, idx) => (
-                          <option key={preset.presetId || preset.caseId || idx} value={idx}>
-                            {preset.presetName || `${preset.caseId}: ${preset.subjectNameOrIdentifier}`}
-                          </option>
+
+                {/* Preset Modification Status Row in Section 1 */}
+                {presetAudit.isPreset && (
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      {presetAudit.isModified ? (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-950/50 border border-amber-800/70 text-amber-300 w-full sm:w-auto">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <span className="font-semibold text-[11px]">
+                            Modified by Examiner ({presetAudit.modifiedCount} adjusted parameter{presetAudit.modifiedCount !== 1 ? "s" : ""})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const orig = FORENSIC_PRESETS.find(
+                                (p) => (caseData.presetId && p.presetId === caseData.presetId) || p.caseId === caseData.caseId
+                              );
+                              if (orig) {
+                                setCaseData(orig);
+                                setAiSynthesisData(null);
+                              }
+                            }}
+                            className="ml-auto text-[10px] text-amber-200 hover:text-white underline cursor-pointer font-medium pl-1"
+                            title="Revert all changes back to original preset baseline"
+                          >
+                            Revert
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-[11px] font-medium">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span>Original Benchmark Baseline (Unaltered)</span>
+                        </div>
+                      )}
+                    </div>
+                    {presetAudit.isModified && presetAudit.modifiedFieldLabels.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        {presetAudit.modifiedFieldLabels.map((diff, i) => (
+                          <span
+                            key={i}
+                            className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-md bg-amber-950/80 text-amber-200 border border-amber-800/80"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                            {diff}
+                          </span>
                         ))}
-                      </select>
-                    );
-                  })()}
-                </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -991,7 +1167,7 @@ export default function App() {
                     <input
                       type="text"
                       value={caseData.caseId}
-                      placeholder="VM-2026-A104"
+                      placeholder="VM-DXB-2026-A841"
                       onChange={(e) => setCaseData({ ...caseData, caseId: e.target.value.toUpperCase() })}
                       className={`w-full bg-slate-950 border rounded-xl px-3 py-2 text-slate-200 focus:outline-none font-mono text-xs ${
                         caseIdValidation.isValid
@@ -1014,11 +1190,11 @@ export default function App() {
                   {/* Validation Status */}
                   <div className="text-[10px] leading-tight mt-1">
                     {caseIdValidation.isValid ? (
-                      <span className="text-teal-400 font-mono">✓ Valid File Number Format (VM-YYYY-XXXX)</span>
+                      <span className="text-teal-400 font-mono">✓ Valid File Number (VM-[EMIRATE]-YYYY-XXXX)</span>
                     ) : caseData.caseId ? (
                       <span className="text-amber-400 font-medium">{caseIdValidation.error}</span>
                     ) : (
-                      <span className="text-slate-500">Format: VM-YYYY-XXXX (4 chars with at least 1 letter)</span>
+                      <span className="text-slate-500">Format: VM-DXB-YYYY-XXXX (3-letter emirate code + year + 4-char suffix)</span>
                     )}
                   </div>
                 </div>
@@ -1088,9 +1264,16 @@ export default function App() {
 
                 {/* Ambient Scene Temp */}
                 <div className="space-y-1">
-                  <label className="text-slate-400 font-medium flex items-center gap-1.5">
-                    <Thermometer className="w-3.5 h-3.5 text-amber-400" /> Ambient Scene Temp (°C)
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-slate-400 font-medium flex items-center gap-1.5">
+                      <Thermometer className="w-3.5 h-3.5 text-amber-400" /> Ambient Scene Temp (°C)
+                    </label>
+                    {isTempModified && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-800/80 font-mono">
+                        Base: {baseTemp}°C
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="number"
                     step="0.5"
@@ -1104,15 +1287,55 @@ export default function App() {
                         decomposition: { ...caseData.decomposition, effectiveMeanTempC: val },
                       });
                     }}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-teal-500 font-mono"
+                    className={`w-full bg-slate-950 border ${
+                      isTempModified ? "border-amber-700/80 text-amber-100" : "border-slate-800 text-slate-200"
+                    } rounded-xl px-3 py-2 focus:outline-none focus:border-teal-500 font-mono`}
+                  />
+                </div>
+
+                {/* Relative Humidity (%) */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-slate-400 font-medium flex items-center gap-1.5">
+                      <Droplets className="w-3.5 h-3.5 text-cyan-400" /> Relative Humidity (%)
+                    </label>
+                    {isHumidityModified && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-800/80 font-mono">
+                        Base: {baseHumidity}%
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={caseData.relativeHumidityPercent !== undefined ? caseData.relativeHumidityPercent : 50}
+                    onChange={(e) => {
+                      const val = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                      setCaseData({
+                        ...caseData,
+                        relativeHumidityPercent: val,
+                      });
+                    }}
+                    className={`w-full bg-slate-950 border ${
+                      isHumidityModified ? "border-amber-700/80 text-amber-100" : "border-slate-800 text-slate-200"
+                    } rounded-xl px-3 py-2 focus:outline-none focus:border-teal-500 font-mono`}
                   />
                 </div>
 
                 {/* Body Weight */}
                 <div className="space-y-1">
-                  <label className="text-slate-400 font-medium flex items-center gap-1.5">
-                    <Activity className="w-3.5 h-3.5 text-emerald-400" /> Body Mass (kg)
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-slate-400 font-medium flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-emerald-400" /> Body Mass (kg)
+                    </label>
+                    {isWeightModified && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-950/90 text-amber-300 border border-amber-800/80 font-mono">
+                        Base: {baseWeight}kg
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="number"
                     value={caseData.bodyWeightKg}
@@ -1124,7 +1347,9 @@ export default function App() {
                         algorMortis: { ...caseData.algorMortis, bodyWeightKg: val },
                       });
                     }}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-teal-500 font-mono"
+                    className={`w-full bg-slate-950 border ${
+                      isWeightModified ? "border-amber-700/80 text-amber-100" : "border-slate-800 text-slate-200"
+                    } rounded-xl px-3 py-2 focus:outline-none focus:border-teal-500 font-mono`}
                   />
                 </div>
 
@@ -1193,7 +1418,8 @@ export default function App() {
           <div id="algor-card" className="scroll-mt-24">
             <AlgorMortisInput
               data={caseData.algorMortis}
-              onChange={(updated) => setCaseData({ ...caseData, algorMortis: updated })}
+              baselineData={presetAudit.baseline?.algorMortis}
+              onChange={(updated) => updateIndicatorModule("algorMortis", updated)}
               isOpen={activeAccordionModule === "algor"}
               onToggleOpen={() => toggleAccordion("algor")}
             />
@@ -1204,7 +1430,7 @@ export default function App() {
             <LivorMortisInput
               data={caseData.livorMortis}
               bodyFoundPosition={caseData.bodyFoundPosition}
-              onChange={(updated) => setCaseData({ ...caseData, livorMortis: updated })}
+              onChange={(updated) => updateIndicatorModule("livorMortis", updated)}
               isOpen={activeAccordionModule === "livor"}
               onToggleOpen={() => toggleAccordion("livor")}
             />
@@ -1214,7 +1440,7 @@ export default function App() {
           <div id="rigor-card" className="scroll-mt-24">
             <RigorMortisInput
               data={caseData.rigorMortis}
-              onChange={(updated) => setCaseData({ ...caseData, rigorMortis: updated })}
+              onChange={(updated) => updateIndicatorModule("rigorMortis", updated)}
               isOpen={activeAccordionModule === "rigor"}
               onToggleOpen={() => toggleAccordion("rigor")}
             />
@@ -1224,7 +1450,7 @@ export default function App() {
           <div id="decomposition-card" className="scroll-mt-24">
             <DecompositionInput
               data={caseData.decomposition}
-              onChange={(updated) => setCaseData({ ...caseData, decomposition: updated })}
+              onChange={(updated) => updateIndicatorModule("decomposition", updated)}
               isOpen={activeAccordionModule === "decomposition"}
               onToggleOpen={() => toggleAccordion("decomposition")}
             />
@@ -1235,7 +1461,7 @@ export default function App() {
             <EntomologyInput
               data={caseData.entomology}
               ambientTempC={caseData.ambientTempC}
-              onChange={(updated) => setCaseData({ ...caseData, entomology: updated })}
+              onChange={(updated) => updateIndicatorModule("entomology", updated)}
               isOpen={activeAccordionModule === "entomology"}
               onToggleOpen={() => toggleAccordion("entomology")}
             />
@@ -1245,7 +1471,7 @@ export default function App() {
           <div id="metabolomics-card" className="scroll-mt-24">
             <MetabolomicsInput
               data={caseData.metabolomics}
-              onChange={(updated) => setCaseData({ ...caseData, metabolomics: updated })}
+              onChange={(updated) => updateIndicatorModule("metabolomics", updated)}
               isOpen={activeAccordionModule === "metabolomics"}
               onToggleOpen={() => toggleAccordion("metabolomics")}
             />

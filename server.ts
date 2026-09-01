@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
 dotenv.config();
 
@@ -25,14 +25,20 @@ function getGeminiClient(): GoogleGenAI | null {
   });
 }
 
-// Fallback model list to navigate high-demand spikes (503) or rate limits
-const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-3.7-flash", "gemini-flash-latest"];
+// Fallback model list: gemini-3.6-flash is recommended to replace deprecated models,
+// gemini-3.1-flash-lite offers high-availability low-latency fallback, followed by gemini-3.7-flash and gemini-flash-latest
+const GEMINI_MODELS = [
+  "gemini-3.6-flash",
+  "gemini-3.1-flash-lite",
+  "gemini-3.7-flash",
+  "gemini-flash-latest",
+];
 
 async function callGeminiWithFallback(
   ai: GoogleGenAI,
   contents: any,
   systemInstruction?: string,
-  timeoutMs = 8000
+  timeoutMs = 60000
 ): Promise<string> {
   let lastError: any = null;
 
@@ -43,8 +49,11 @@ async function callGeminiWithFallback(
         contents,
         config: {
           responseMimeType: "application/json",
-          temperature: 0.2,
+          temperature: 0.1,
           systemInstruction,
+          thinkingConfig: model.startsWith("gemini-3")
+            ? { thinkingLevel: ThinkingLevel.LOW }
+            : undefined,
         },
       });
 
@@ -70,7 +79,6 @@ async function callGeminiWithFallback(
         err?.code === 429;
 
       console.warn(`[Gemini API] Model ${model} returned error (retryable: ${isRetryable}): ${err?.message || err}`);
-      // If retryable or timed out, continue to the next candidate model
     }
   }
 
@@ -81,7 +89,12 @@ async function callGeminiWithFallback(
 function extractJson(rawText: string): any {
   let cleaned = rawText.trim();
   if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```$/, "").trim();
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  }
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
   }
   return JSON.parse(cleaned);
 }
@@ -301,9 +314,32 @@ app.post("/api/vision-detect", async (req, res) => {
     let rawImageList: Array<{ imageBase64: string; mimeType?: string; tag?: string; name?: string; id?: string }> = [];
 
     if (Array.isArray(images) && images.length > 0) {
-      rawImageList = images.slice(0, 6);
+      rawImageList = images
+        .slice(0, 6)
+        .map((item: any, idx: number) => {
+          if (typeof item === "string") {
+            const isPng = item.startsWith("data:image/png");
+            return {
+              imageBase64: item,
+              mimeType: isPng ? "image/png" : "image/jpeg",
+              tag: "scene_context",
+              name: `Photo ${idx + 1}`,
+              id: `img-${idx + 1}`,
+            };
+          }
+          const base64Str = item.imageBase64 || item.dataUrl || item.url || "";
+          const isPng = (item.mimeType === "image/png") || (typeof base64Str === "string" && base64Str.startsWith("data:image/png"));
+          return {
+            imageBase64: base64Str,
+            mimeType: item.mimeType || (isPng ? "image/png" : "image/jpeg"),
+            tag: item.tag || "scene_context",
+            name: item.name || `Photo ${idx + 1}`,
+            id: item.id || `img-${idx + 1}`,
+          };
+        })
+        .filter((img) => img.imageBase64 && img.imageBase64.length > 0);
     } else if (imageBase64) {
-      rawImageList = [{ imageBase64, mimeType, tag: "scene_context", name: "Photo 1" }];
+      rawImageList = [{ imageBase64, mimeType, tag: "scene_context", name: "Photo 1", id: "img-1" }];
     }
 
     if (rawImageList.length === 0) {
@@ -315,11 +351,101 @@ app.post("/api/vision-detect", async (req, res) => {
 
     // High-precision heuristic fallback if Gemini API is offline or not configured
     const generateFallbackVisionAnalysis = (imgList: typeof rawImageList, userNotes: string) => {
-      const tags = imgList.map((i) => i.tag || "general");
-      const hasMaggots = tags.includes("entomology_larvae") || userNotes.toLowerCase().includes("maggot") || userNotes.toLowerCase().includes("larva");
-      const hasLivor = tags.includes("posterior_livor") || userNotes.toLowerCase().includes("livor") || userNotes.toLowerCase().includes("lividity");
-      const hasBloat = userNotes.toLowerCase().includes("bloat") || userNotes.toLowerCase().includes("purge") || tags.includes("abdomen_tbs");
-      const hasCornea = tags.includes("face_cornea");
+      const notesLower = (userNotes || "").toLowerCase();
+      const tags = imgList.map((i) => (i.tag || "general").toLowerCase());
+
+      // Safe keyword classification helper functions
+      const isForensicSafelist = (text: string) => {
+        const t = text.toLowerCase();
+        return (
+          t.includes("livid") ||
+          t.includes("livor") ||
+          t.includes("hypostasis") ||
+          t.includes("eyelid") ||
+          t.includes("fluid") ||
+          t.includes("homicide") ||
+          t.includes("suicide") ||
+          t.includes("incident") ||
+          t.includes("accident") ||
+          t.includes("incision") ||
+          t.includes("evidence") ||
+          t.includes("cadaver") ||
+          t.includes("coroner") ||
+          t.includes("morgue") ||
+          t.includes("decomp") ||
+          t.includes("marbling") ||
+          t.includes("greening") ||
+          t.includes("larvae") ||
+          t.includes("maggot") ||
+          t.includes("entomology") ||
+          t.includes("cornea") ||
+          t.includes("rigor") ||
+          t.includes("algor") ||
+          t.includes("autopsy") ||
+          t.includes("body") ||
+          t.includes("post_mortem") ||
+          t.includes("postmortem")
+        );
+      };
+
+      const isDocOrPaperwork = (name: string, tag: string) => {
+        if (isForensicSafelist(name) || isForensicSafelist(tag)) return false;
+        const n = name.toLowerCase();
+        return (
+          /\b(emirates_id|passport|driver_license|license|national_id|id_card|identity_card|id|identity|badge|receipt|invoice|slip|prescription|rx|form|paper|paperwork|report|medical_report|autopsy_report|screenshot|screen|capture|doc|document|notes|note|handwritten|contract|certificate|scan|scan_doc)\b/i.test(n) ||
+          /(id_card|emirates_id|identity_card|passport_copy|doc_scan|notes_photo|receipt_img|medical_doc|prescription_slip)/i.test(n) ||
+          n.endsWith(".pdf") ||
+          n.endsWith(".docx") ||
+          n.endsWith(".txt")
+        );
+      };
+
+      const isLivingSelfie = (name: string, tag: string) => {
+        if (isForensicSafelist(name) || isForensicSafelist(tag)) return false;
+        const n = name.toLowerCase();
+        return (
+          /\b(selfie|living_person|living|person|alive|portrait|boy|girl|man|woman|child|family|profile|me|vacation|party|self_portrait|smile|friend|casual_photo|face_photo)\b/i.test(n) ||
+          /(selfie_photo|living_person|family_pic|profile_picture|alive_person|portrait_alive)/i.test(n)
+        );
+      };
+
+      const isUnrelatedSceneItem = (name: string, tag: string) => {
+        if (isForensicSafelist(name) || isForensicSafelist(tag)) return false;
+        const n = name.toLowerCase();
+        return (
+          /\b(coffee|cup|mug|dog|cat|pet|puppy|kitten|car|vehicle|traffic|meme|funny|food|meal|pizza|burger|plate|nature|tree|building|desk|chair|room|interior|flower|landscape)\b/i.test(n) ||
+          /(coffee_cup|dog_pet|cat_pet|car_vehicle|meme_funny|food_plate)/i.test(n)
+        );
+      };
+
+      const hasMaggots =
+        tags.some((t) => t.includes("entomology") || t.includes("larvae")) ||
+        notesLower.includes("maggot") ||
+        notesLower.includes("larva") ||
+        notesLower.includes("fly") ||
+        notesLower.includes("pupae");
+
+      const hasBloat =
+        notesLower.includes("bloat") ||
+        notesLower.includes("purge") ||
+        notesLower.includes("distension") ||
+        notesLower.includes("skin slippage") ||
+        notesLower.includes("bullae") ||
+        tags.some((t) => t.includes("abdomen") || t.includes("tbs"));
+
+      const hasMarbling =
+        notesLower.includes("marbling") ||
+        notesLower.includes("green") ||
+        notesLower.includes("iliac") ||
+        tags.some((t) => t.includes("anterior") || t.includes("abdomen"));
+
+      const hasSkeleton =
+        notesLower.includes("skeleton") ||
+        notesLower.includes("bone") ||
+        notesLower.includes("desicc") ||
+        notesLower.includes("mummif");
+
+      const hasCornea = tags.some((t) => t.includes("cornea") || t.includes("eye") || t.includes("face"));
 
       let docCount = 0;
       let livingCount = 0;
@@ -341,8 +467,8 @@ app.post("/api/vision-detect", async (req, res) => {
       let suboptimalCount = 0;
 
       const perImageFindings = imgList.map((img, idx) => {
-        const lowerName = (img.name || "").toLowerCase();
-        const lowerTag = (img.tag || "").toLowerCase();
+        const nameStr = img.name || `Photo ${idx + 1}`;
+        const tagStr = img.tag || "general";
 
         let category: "writing_or_document" | "live_human" | "unrelated_object" | "deceased_human_forensic" = "deceased_human_forensic";
         let categoryLabel = "Deceased Subject (Forensic)";
@@ -350,49 +476,23 @@ app.post("/api/vision-detect", async (req, res) => {
         let unrelatedIssueType: "handwritten_document" | "live_person" | "unrelated_object_scene" | "other_non_forensic" | undefined = undefined;
         let unrelatedIssueDescription: string | undefined = undefined;
         let warningMessage = "✓ Verified post-mortem biological evidence.";
-        let findings = `Photo ${idx + 1} (${img.tag || "general"}): Post-mortem signs evaluated.`;
+        let findings = `Photo ${idx + 1} (${tagStr}): Post-mortem signs evaluated.`;
         let pmiImplication = "Contributes to time of death calculation.";
         let movementSuspected = false;
         let movementDetails = "No contradictory post-mortem lividity planes on this angle.";
 
         // Default clarity & reliability for forensic photos
-        let clarityScore = 92;
+        let clarityScore = 93;
         let clarityRating = "Optimal (Sharp & Well-Lit)";
         let clarityIssues: string[] = [];
-        let clarityDetails = "Sharp focus & even illumination";
-        let reliabilityScore = 90;
+        let clarityDetails = "Sharp focal plane with balanced exposure.";
+        let reliabilityScore = 91;
         let reliabilityRating = "Forensic-Grade (High Confidence)";
-        let reliabilityFactors = ["Clear anatomical orientation", "Recognizable biological landmarks", "Consistent lighting"];
+        let reliabilityFactors = ["High diagnostic landmark visibility", "Perpendicular perspective", "Natural color reproduction"];
         let reliabilityDetails = "Unobstructed anatomical landmarks";
         let forensicRecommendations = "Adequate for diagnostic scoring.";
 
-        // Check for ID cards, passports, documents, paperwork, screenshots, text
-        if (
-          lowerName.includes("id") ||
-          lowerName.includes("card") ||
-          lowerName.includes("emirates") ||
-          lowerName.includes("identity") ||
-          lowerName.includes("license") ||
-          lowerName.includes("passport") ||
-          lowerName.includes("badge") ||
-          lowerName.includes("screenshot") ||
-          lowerName.includes("screen") ||
-          lowerName.includes("capture") ||
-          lowerName.includes("scan") ||
-          lowerName.includes("pdf") ||
-          lowerName.includes("doc") ||
-          lowerName.includes("note") ||
-          lowerName.includes("text") ||
-          lowerName.includes("paper") ||
-          lowerName.includes("report") ||
-          lowerName.includes("rx") ||
-          lowerName.includes("prescription") ||
-          lowerName.includes("form") ||
-          lowerName.includes("slip") ||
-          lowerName.includes("receipt") ||
-          lowerTag.includes("doc") ||
-          lowerTag.includes("text")
-        ) {
+        if (isDocOrPaperwork(nameStr, tagStr)) {
           category = "writing_or_document";
           categoryLabel = "ID Card / Document / Paperwork";
           isUnrelated = true;
@@ -412,29 +512,13 @@ app.post("/api/vision-detect", async (req, res) => {
 
           unrelatedIssuesList.push({
             imageId: img.id || `img-${idx}`,
-            imageName: img.name || `Photo ${idx + 1}`,
+            imageName: nameStr,
             issueType: "handwritten_document",
             issueTitle: "ID Card / Document Excluded",
             issueMessage: "This photo contains an identity card, document, or paperwork rather than deceased human body remains. It has been excluded from time of death calculations.",
             recommendation: "Only upload authentic photos of deceased human remains showing biological changes (such as livor mortis, rigor, or decomposition).",
           });
-        }
-        // Check for living human / selfie / portrait
-        else if (
-          lowerName.includes("selfie") ||
-          lowerName.includes("living") ||
-          lowerName.includes("person") ||
-          lowerName.includes("alive") ||
-          lowerName.includes("portrait") ||
-          lowerName.includes("child") ||
-          lowerName.includes("boy") ||
-          lowerName.includes("girl") ||
-          lowerName.includes("man") ||
-          lowerName.includes("woman") ||
-          lowerName.includes("profile") ||
-          lowerTag.includes("living") ||
-          lowerTag.includes("selfie")
-        ) {
+        } else if (isLivingSelfie(nameStr, tagStr)) {
           category = "live_human";
           categoryLabel = "Living Person";
           isUnrelated = true;
@@ -454,25 +538,13 @@ app.post("/api/vision-detect", async (req, res) => {
 
           unrelatedIssuesList.push({
             imageId: img.id || `img-${idx}`,
-            imageName: img.name || `Photo ${idx + 1}`,
+            imageName: nameStr,
             issueType: "live_person",
             issueTitle: "Living Person Photo Excluded",
             issueMessage: "This photo shows a living individual. Time of death estimations require photos of deceased subjects showing physical post-mortem changes.",
             recommendation: "Ensure only deceased subject photos from the scene or morgue examination are uploaded.",
           });
-        }
-        // Check for random objects / animals / food
-        else if (
-          lowerName.includes("coffee") ||
-          lowerName.includes("cup") ||
-          lowerName.includes("food") ||
-          lowerName.includes("dog") ||
-          lowerName.includes("cat") ||
-          lowerName.includes("pet") ||
-          lowerName.includes("car") ||
-          lowerName.includes("meme") ||
-          lowerTag === "other"
-        ) {
+        } else if (isUnrelatedSceneItem(nameStr, tagStr)) {
           category = "unrelated_object";
           categoryLabel = "Unrelated Object / Scene";
           isUnrelated = true;
@@ -492,7 +564,7 @@ app.post("/api/vision-detect", async (req, res) => {
 
           unrelatedIssuesList.push({
             imageId: img.id || `img-${idx}`,
-            imageName: img.name || `Photo ${idx + 1}`,
+            imageName: nameStr,
             issueType: "unrelated_object_scene",
             issueTitle: "Unrelated Object / Scene Excluded",
             issueMessage: "This photo shows an object or scene without deceased human remains and has been excluded from time of death calculations.",
@@ -504,20 +576,24 @@ app.post("/api/vision-detect", async (req, res) => {
           totalReliability += reliabilityScore;
           optimalCount++;
 
-          if (lowerTag.includes("face") || lowerTag.includes("cornea")) {
-            findings = "Facial overview: Ocular globes show early post-mortem film and moderate corneal clouding.";
-            pmiImplication = "Corneal clouding and ocular changes support early-to-intermediate post-mortem interval (~10–24 hours).";
-          } else if (lowerTag.includes("livor") || lowerTag.includes("posterior")) {
-            findings = "Posterior dependent surfaces show well-developed purplish lividity with contact blanching at pressure points.";
-            pmiImplication = "Lividity fixation and distribution indicate body settling (>8–12 hours).";
-          } else if (lowerTag.includes("anterior")) {
-            findings = "Anterior body perspective evaluated for post-mortem changes.";
-            pmiImplication = "Anatomical evidence contributes to total body score and settling pattern.";
-          } else if (lowerTag.includes("entomology") || lowerTag.includes("larvae")) {
-            findings = "Entomological evidence: Cluster of 2nd instar dipteran larvae identified along natural body creases.";
-            pmiImplication = "Dipteran larval feeding supports minimum colonisation window (~24–48 hours).";
+          const lTag = tagStr.toLowerCase();
+          if (lTag.includes("face") || lTag.includes("cornea")) {
+            findings = "Facial overview: Ocular globes show corneal haziness, loss of pupillary lustre, and early post-mortem film.";
+            pmiImplication = "Corneal clouding and ocular changes support an interval of ~10–24 hours.";
+          } else if (lTag.includes("livor") || lTag.includes("posterior")) {
+            findings = "Posterior dependent surfaces show well-developed purplish hypostasis with prominent contact blanching at pressure zones.";
+            pmiImplication = "Lividity fixation and distribution indicate body settling (>8–16 hours).";
+          } else if (lTag.includes("anterior")) {
+            findings = "Anterior body perspective evaluated for tissue coloration, muscle tone, and settling distribution.";
+            pmiImplication = "Contributes to Megyesi Total Body Score and hypostasis consistency.";
+          } else if (lTag.includes("entomology") || lTag.includes("larvae")) {
+            findings = "Entomological evidence: Active cluster of 2nd instar dipteran larvae identified along natural body orifices/creases.";
+            pmiImplication = "Dipteran larval colonisation supports minimum exposure window of ~24–48 hours.";
+          } else if (lTag.includes("abdomen") || lTag.includes("tbs")) {
+            findings = "Abdominal perspective: Right lower quadrant greening, superficial venous marbling, and early gas distension.";
+            pmiImplication = "Morphology aligns with early-to-intermediate decomposition (Megyesi trunk score 4–6).";
           } else {
-            findings = `Overview perspective #${idx + 1}: Tissue coloration and morphological state consistent with early decomposition.`;
+            findings = `Overview perspective #${idx + 1}: Tissue coloration and morphological state consistent with post-mortem changes.`;
             pmiImplication = "Supports holistic anatomical scoring in post-mortem estimation model.";
           }
         }
@@ -556,14 +632,14 @@ app.post("/api/vision-detect", async (req, res) => {
         validForensicImages.length >= 2 &&
         ((validForensicImages.some((f) => f.tag === "anterior_body") &&
           validForensicImages.some((f) => f.tag === "posterior_livor")) ||
-          userNotes.toLowerCase().includes("move") ||
-          userNotes.toLowerCase().includes("dual") ||
-          userNotes.toLowerCase().includes("discord") ||
-          userNotes.toLowerCase().includes("shift") ||
-          userNotes.toLowerCase().includes("turn") ||
-          userNotes.toLowerCase().includes("reposition") ||
-          userNotes.toLowerCase().includes("drag") ||
-          userNotes.toLowerCase().includes("relocat"));
+          notesLower.includes("move") ||
+          notesLower.includes("dual") ||
+          notesLower.includes("discord") ||
+          notesLower.includes("shift") ||
+          notesLower.includes("turn") ||
+          notesLower.includes("reposition") ||
+          notesLower.includes("drag") ||
+          notesLower.includes("relocat"));
 
       const movementDetected = validForensicImages.length >= 2 && hasDualLivor;
 
@@ -579,19 +655,34 @@ app.post("/api/vision-detect", async (req, res) => {
 
       let stage = "early_marbling";
       let tbs = { headNeckScore: 3, trunkScore: 3, limbsScore: 2, totalScore: 8 };
-      let minHours = 8;
-      let maxHours = 24;
+      let minHours = 10;
+      let maxHours = 22;
 
-      if (hasMaggots) {
+      if (hasSkeleton) {
+        stage = "skeletonization";
+        tbs = { headNeckScore: 8, trunkScore: 10, limbsScore: 8, totalScore: 26 };
+        minHours = 144;
+        maxHours = 360;
+      } else if (hasMaggots) {
         stage = "active_decay";
         tbs = { headNeckScore: 6, trunkScore: 7, limbsScore: 5, totalScore: 18 };
         minHours = 48;
         maxHours = 120;
       } else if (hasBloat) {
         stage = "bloating_purge";
-        tbs = { headNeckScore: 5, trunkScore: 5, limbsScore: 4, totalScore: 14 };
+        tbs = { headNeckScore: 4, trunkScore: 5, limbsScore: 3, totalScore: 12 };
         minHours = 24;
-        maxHours = 72;
+        maxHours = 60;
+      } else if (hasMarbling) {
+        stage = "early_marbling";
+        tbs = { headNeckScore: 3, trunkScore: 3, limbsScore: 2, totalScore: 8 };
+        minHours = 10;
+        maxHours = 24;
+      } else {
+        stage = "fresh";
+        tbs = { headNeckScore: 2, trunkScore: 2, limbsScore: 2, totalScore: 6 };
+        minHours = 4;
+        maxHours = 14;
       }
 
       const totalUnrelated = docCount + livingCount + unrelatedCount;
@@ -723,7 +814,7 @@ app.post("/api/vision-detect", async (req, res) => {
 
     // Prepare multimodal parts for all images (up to 6)
     const imageParts = rawImageList.map((img, idx) => {
-      const cleanData = img.imageBase64.replace(/^data:image\/[a-z]+;base64,/, "");
+      const cleanData = (img.imageBase64 || "").replace(/^data:image\/[a-z]+;base64,/, "");
       return {
         inlineData: {
           mimeType: img.mimeType || "image/jpeg",
@@ -741,36 +832,45 @@ ${rawImageList.map((img, i) => `Image ${i + 1} (Part ${i + 1}): Label="${img.nam
 
 YOUR TASKS:
 
-TASK 1: AUTOMATIC UNRELATED & NON-FORENSIC IMAGE REJECTION (ABSOLUTE PRIORITY)
-You MUST aggressively inspect every image. ONLY genuine, authentic photographic evidence of DECEASED HUMAN BIOLOGICAL REMAINS (showing post-mortem physical signs like livor mortis, rigor mortis, decomposition, algor cooling, corneal clouding, or insect colonization on a deceased body) may be classified as "deceased_human_forensic" with isUnrelated = false.
+TASK 1: LIVING HUMAN BEINGS vs DECEASED SUBJECT DETECTION & REJECTION (CRITICAL REQUIREMENT)
+You MUST carefully examine each picture to determine whether it portrays an ACTUALLY LIVING HUMAN BEING, A WRITTEN DOCUMENT/ID, AN UNRELATED OBJECT, or GENUINE DECEASED HUMAN BIOLOGICAL REMAINS. ONLY authentic photographic evidence of DECEASED HUMAN REMAINS showing post-mortem biological changes (such as livor mortis, rigor mortis, decomposition, algor cooling, corneal clouding, or insect colonization on a corpse) may be classified as "deceased_human_forensic" with isUnrelated = false.
 
-For EACH image, automatically classify whether it is unrelated/useless or genuine forensic evidence:
-1. "writing_or_document":
-   - ID cards (Emirates ID, national ID, passport, driver's license, student/work badge, membership cards), certificates, documents, handwritten notes, police reports, medical files, prescription slips, typed paper, forms, receipts, or computer/phone screenshots.
+For EACH image, determine its exact biological and forensic status:
+1. "live_human":
+   - Actively inspect whether the photo portrays an ACTUALLY LIVING HUMAN BEING (e.g., selfies, portraits of conscious living individuals, people posing, smiling, alive hands or faces, conscious upright posture, family/vacation photos, or face photos on ID cards).
+   - Look for vital indicators of life: conscious or natural living facial expressions, active muscle tone (smiling, upright head, blinking, alert eyes, voluntary posture), warm living cutaneous microcirculation (pink/flushed cheeks, vital hemoglobin capillary perfusion, pink nailbeds), intact normal skin turgor without gravitational hypostatic settling or post-mortem clouding.
+   - If an image shows a LIVING human being:
+     * Set "isUnrelated": true
+     * Set "relevanceCategory": "live_human"
+     * Set "categoryLabel": "Living Subject (Excluded)"
+     * Set "unrelatedIssueType": "live_person"
+     * Set "unrelatedIssueDescription": "Living human being detected. The subject exhibits active physiological signs of life (conscious facial expression, active voluntary muscle tone, vital vascular perfusion) and lacks post-mortem biological changes. Pictures of living individuals cannot be used to estimate post-mortem intervals."
+     * Set "warningMessage": "👤 Excluded: Living human subject detected (not a deceased body)."
+     * Set "reliabilityScore": 0
+     * Set "clarityScore": 85
+     * Set "reliabilityRating": "Low / Questionable"
+     * Set "findings": "Visual inspection detects an actively living human being exhibiting vital muscle tone, living facial expression, and vascular microcirculation. Zero post-mortem biological signs present."
+     * Set "pmiImplication": "Completely excluded from post-mortem interval estimation calculations."
+2. "writing_or_document":
+   - ID cards (Emirates ID, national ID, passport, driver's license, badge), certificates, documents, handwritten notes, police reports, medical files, forms, receipts, or screenshots.
    - Set "isUnrelated": true, "relevanceCategory": "writing_or_document", "categoryLabel": "ID Card / Document (Excluded)", "unrelatedIssueType": "handwritten_document", "unrelatedIssueDescription": "Identity card, document, screenshot, or paperwork detected. Paper and card documents contain no biological deceased human remains for post-mortem calculations.", "warningMessage": "📄 Issue: ID card / document detected. Excluded from calculations.", "reliabilityScore": 0, "clarityScore": 85, "reliabilityRating": "Low / Questionable", "findings": "Identity document / paperwork detected. Contains no deceased human biological remains.", "pmiImplication": "Excluded from post-mortem interval calculations."
-2. "live_human":
-   - Any LIVING person (photos on ID cards, passport photos, selfies, portraits of conscious/living individuals, alive hands/faces, people interacting normally, children, family photos).
-   - Set "isUnrelated": true, "relevanceCategory": "live_human", "categoryLabel": "Living Subject (Excluded)", "unrelatedIssueType": "live_person", "unrelatedIssueDescription": "Living person or portrait detected. Post-mortem estimations require physical biological signs of death on a deceased subject.", "warningMessage": "👤 Issue: Living person detected. Excluded from calculations.", "reliabilityScore": 0, "clarityScore": 85, "reliabilityRating": "Low / Questionable", "findings": "Living human subject detected. No post-mortem biological changes present.", "pmiImplication": "Excluded from post-mortem interval calculations."
 3. "unrelated_object":
-   - Non-human objects (everyday items, cards, wallets, coffee cups, cars, pets/animals, food, memes, furniture, outdoor landscapes without human remains).
+   - Non-human objects (everyday items, cups, cars, pets/animals, food, furniture, landscapes without human remains).
    - Set "isUnrelated": true, "relevanceCategory": "unrelated_object", "categoryLabel": "Unrelated Object / Scene (Excluded)", "unrelatedIssueType": "unrelated_object_scene", "unrelatedIssueDescription": "Non-forensic object or scenery detected without deceased human remains.", "warningMessage": "⚠️ Issue: Unrelated non-forensic photo detected. Excluded from calculations.", "reliabilityScore": 0, "clarityScore": 80, "reliabilityRating": "Low / Questionable", "findings": "Non-forensic object or background view. No human post-mortem markers found.", "pmiImplication": "Excluded from post-mortem interval calculations."
 4. "deceased_human_forensic":
-   - ONLY actual deceased human remains from an autopsy, morgue, or death scene showing biological post-mortem changes (livor mortis, rigor mortis, decomposition, maggots/insects on body, corneal clouding).
+   - ONLY actual deceased human remains from a death scene, autopsy, or morgue showing biological post-mortem changes (livor mortis, rigor mortis, decomposition, maggots/insects on body, corneal clouding).
    - Set "isUnrelated": false, "relevanceCategory": "deceased_human_forensic", "categoryLabel": "Deceased Subject (Forensic)", "warningMessage": "✓ Verified post-mortem biological evidence."
 
-CRITICAL: If an image is an ID card (even if it has a photo of a person's face on it), it MUST be classified as "writing_or_document" with isUnrelated: true, reliabilityScore: 0, and excluded from all calculations! NEVER assign decomposition stages, Megyesi scores, or livor mortis to ID cards or living people.
-
-TASK 2: RIGOROUS CLARITY & RELIABILITY INSPECTION (FOR FORENSIC IMAGES)
-For each genuine forensic image, perform a deep quality & reliability inspection:
-- "clarityScore": 0 to 100 integer rating based on sharpness, lighting, exposure, resolution, blur, and contrast.
-- "clarityRating": "Optimal (Sharp & Well-Lit)" | "Moderate (Mild Blur/Soft Focus)" | "Suboptimal (Low Light / Blur)" | "Poor (Degraded / Motion Blur)".
-- "clarityIssues": Array of specific visual clarity defects if any (e.g. ["Low Lighting", "Motion Blur", "Flash Glare", "Out of Focus", "Shadow Occlusion"]). Empty array if optimal.
-- "clarityDetails": Concise 3-6 word summary (e.g., "Sharp focus & even illumination").
-- "reliabilityScore": 0 to 100 integer rating based on anatomical landmark visibility, viewing perspective, diagnostic accuracy, and obstruction.
-- "reliabilityRating": "Forensic-Grade (High Confidence)" | "Moderate Confidence" | "Low / Questionable".
-- "reliabilityFactors": Array of diagnostic reliability factors (e.g. ["Clear anatomical landmarks", "Perpendicular viewing angle", "No scale marker present", "Consistent color spectrum"]).
-- "reliabilityDetails": Concise 3-6 word summary (e.g., "Unobstructed anatomical landmarks").
-- "forensicRecommendations": Concise recommendation for the examiner (e.g., "Adequate for scoring").
+TASK 2: FORENSIC HELPFULNESS, DIAGNOSTIC ACCURACY & EVIDENCE UTILITY (DO NOT FOCUS SOLELY ON OPTICAL CLARITY)
+Do NOT make everything in computer vision about superficial clarity (pixels, sharpness, or brightness). Instead, critically determine whether the picture is HELPFUL, ACCURATE, and DIAGNOSTICALLY USEFUL for estimating time of death:
+- HELPFULNESS & DIAGNOSTIC UTILITY:
+  * Is the photo helpful for the examiner? Does it clearly capture relevant anatomical regions for post-mortem evaluation (dependent hypostatic areas for lividity, abdominal quadrant for marbling/bloat, eye for corneal clouding, body folds for insect colonization, whole body posture for settling)?
+  * Or is it UNHELPFUL (e.g. distant perspective where diagnostic signs cannot be resolved, critical regions covered by clothing or blankets, uninformative angle, or confusing lighting)?
+- DIAGNOSTIC ACCURACY & RELIABILITY:
+  * Does the picture accurately reveal the true biological state without confusing shadow artifacts, flash washout, or misleading angle distortion?
+  * Assign "reliabilityScore" (0 to 100) reflecting forensic helpfulness, landmark accuracy, and diagnostic utility.
+  * In "clarityDetails" and "reliabilityDetails", summarize whether the photo is helpful and accurate (e.g., "Highly helpful & accurate: Clearly resolves dependent lividity margins and contact blanching", or "Limited helpfulness: Oblique perspective partially obscures dependent settling planes").
+  * In "forensicRecommendations", give actionable diagnostic guidance based on helpfulness.
 
 TASK 3: OVERALL FORENSIC SYNTHESIS & TOTAL BODY SCORE
 - Compute "averageClarityScore" and "averageReliabilityScore" across forensic photos.

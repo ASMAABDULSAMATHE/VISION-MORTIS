@@ -99,7 +99,7 @@ export const AppFooter: React.FC<Props> = ({
                 className="hover:text-teal-300 transition-colors cursor-pointer text-left flex items-center gap-1.5"
               >
                 <Camera className="w-3 h-3 text-slate-500" />
-                <span>• Photo Upload &amp; Vision AI</span>
+                <span>• Computer Vision AI (Multimodal Imaging)</span>
               </button>
             </li>
             <li>
@@ -109,7 +109,7 @@ export const AppFooter: React.FC<Props> = ({
                 className="hover:text-teal-300 transition-colors cursor-pointer text-left flex items-center gap-1.5"
               >
                 <Thermometer className="w-3 h-3 text-slate-500" />
-                <span>• Body Cooling (0–24 hrs)</span>
+                <span>• Algor Mortis (Body Cooling)</span>
               </button>
             </li>
             <li>
@@ -119,7 +119,7 @@ export const AppFooter: React.FC<Props> = ({
                 className="hover:text-teal-300 transition-colors cursor-pointer text-left flex items-center gap-1.5"
               >
                 <Droplet className="w-3 h-3 text-slate-500" />
-                <span>• Blood Settling &amp; Lividity (0.5–12 hrs)</span>
+                <span>• Livor Mortis</span>
               </button>
             </li>
             <li>
@@ -129,7 +129,7 @@ export const AppFooter: React.FC<Props> = ({
                 className="hover:text-teal-300 transition-colors cursor-pointer text-left flex items-center gap-1.5"
               >
                 <Activity className="w-3 h-3 text-slate-500" />
-                <span>• Muscle Stiffening (1–36 hrs)</span>
+                <span>• Rigor Mortis (Muscle Stiffening)</span>
               </button>
             </li>
             <li>
@@ -139,7 +139,7 @@ export const AppFooter: React.FC<Props> = ({
                 className="hover:text-teal-300 transition-colors cursor-pointer text-left flex items-center gap-1.5"
               >
                 <Skull className="w-3 h-3 text-slate-500" />
-                <span>• Body Decay &amp; Total Body Score (1–30 days)</span>
+                <span>• Decomposition (Megyesi Total Body Score)</span>
               </button>
             </li>
             <li>
@@ -149,7 +149,7 @@ export const AppFooter: React.FC<Props> = ({
                 className="hover:text-teal-300 transition-colors cursor-pointer text-left flex items-center gap-1.5"
               >
                 <Bug className="w-3 h-3 text-slate-500" />
-                <span>• Insect &amp; Maggot Activity</span>
+                <span>• Forensic Entomology (Insect Succession)</span>
               </button>
             </li>
             <li>
@@ -159,7 +159,7 @@ export const AppFooter: React.FC<Props> = ({
                 className="hover:text-teal-300 transition-colors cursor-pointer text-left flex items-center gap-1.5"
               >
                 <TestTube2 className="w-3 h-3 text-slate-500" />
-                <span>• Eye Fluid Chemistry (Potassium)</span>
+                <span>• Metabolomics (Vitreous Potassium [K+])</span>
               </button>
             </li>
             <li>
@@ -169,7 +169,7 @@ export const AppFooter: React.FC<Props> = ({
                 className="text-teal-400 hover:text-teal-300 font-semibold transition-colors cursor-pointer text-left flex items-center gap-1.5 pt-1"
               >
                 <FileText className="w-3 h-3" />
-                <span>• Jump to Full Case Report</span>
+                <span>• Case Report &amp; Medico-Legal Synthesis</span>
               </button>
             </li>
           </ul>

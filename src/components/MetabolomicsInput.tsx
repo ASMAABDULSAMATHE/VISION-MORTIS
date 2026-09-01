@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { MetabolomicsData, ActiveMetaboliteItem } from "../types";
 import { evaluateMetabolomics } from "../utils/forensicCalculations";
+import { formatIndicatorTimestamp } from "../utils/validation";
 import {
   TestTube2,
   AlertCircle,
@@ -14,6 +15,12 @@ import {
   Trash2,
   Activity,
   Sparkles,
+  Clock,
+  ShieldAlert,
+  ArrowRight,
+  Gauge,
+  Droplets,
+  Zap,
 } from "lucide-react";
 
 interface Props {
@@ -79,9 +86,9 @@ const METABOLITE_CATALOG = [
     min: 8,
     max: 120,
     step: 1,
-    referenceRange: "10 – 25 mg/dL (Normal renal profile)",
-    description: "Electrolyte stability check. Elevated VUN flags antemortem uremia/dehydration that affects K+ slopes.",
-    calculatePmi: (_val: number) => 0, // Diagnostic modifier
+    referenceRange: "10 – 25 mg/dL (Antemortem baseline)",
+    description: "Post-mortem stable renal validator. VUN > 35–40 mg/dL confirms antemortem azotemia/uremia, requiring baseline [K⁺] offset correction to avoid gross PMI overestimation.",
+    calculatePmi: (_val: number) => 0, // Diagnostic validator & correction coefficient
   },
   {
     key: "vitreous_sodium",
@@ -91,9 +98,12 @@ const METABOLITE_CATALOG = [
     min: 100,
     max: 180,
     step: 1,
-    referenceRange: "135 – 150 mmol/L (Normal electrolyte equilibrium)",
-    description: "Evaluates antemortem dehydration or water intoxication (aquatic immersion verification).",
-    calculatePmi: (_val: number) => 0, // Diagnostic modifier
+    referenceRange: "135 – 150 mmol/L (Normal equilibrium)",
+    description: "Demonstrates slow linear decline (~0.5 mmol/L/h) from 142 baseline. Identifies severe dehydration (>152) or hemodilution (<125) that skews [K⁺].",
+    calculatePmi: (val: number) => {
+      // Linear post-mortem decline from ~142 baseline at ~0.5 mmol/L per hour (Coe / Madea)
+      return val <= 142 ? Math.max(1, Math.min(72, Number(((142 - val) / 0.5).toFixed(1)))) : 1;
+    },
   },
   {
     key: "vitreous_glucose",
@@ -217,8 +227,11 @@ export const MetabolomicsInput: React.FC<Props> = ({
   };
 
   const k = data.vitreousPotassiumMmolL;
-  const pmiMadea = Math.max(0, 5.26 * (k - 4.0));
-  const pmiSturner = Math.max(0, 7.14 * k - 39.1);
+  const vun = data.ureaNitrogenMgDl ?? 18;
+  const na = data.vitreousSodiumMmolL ?? 140;
+
+  const rawPmiMadea = Math.max(0, 5.26 * (k - 4.0));
+  const rawPmiSturner = Math.max(0, 7.14 * k - 39.1);
 
   return (
     <div id="metabolomics-card" className="scroll-mt-20 rounded-xl bg-slate-900/90 border border-slate-800 p-5 space-y-4 transition-all">
@@ -229,13 +242,21 @@ export const MetabolomicsInput: React.FC<Props> = ({
             <TestTube2 className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-slate-100 flex items-center gap-2">
-              Metabolomics
+            <h3 className="text-base font-semibold text-slate-100 flex items-center gap-2 flex-wrap">
+              <span>Metabolomics & Vitreous Electrolyte Triad</span>
               <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-teal-950/80 text-teal-400 border border-teal-800/50">
                 0 – 72 Hours
               </span>
+              {data.recordedAt && (
+                <span className="text-[10px] font-mono text-teal-300 px-2 py-0.5 rounded-md bg-slate-950/90 border border-slate-800 flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-teal-400" />
+                  <span>Logged: {formatIndicatorTimestamp(data.recordedAt)}</span>
+                </span>
+              )}
             </h3>
-            <p className="text-xs text-slate-400">Vitreous humor and biochemical kinetics with multi-analyte profiling</p>
+            <p className="text-xs text-slate-400">
+              Vitreous humor [K⁺], [Na⁺], and VUN triad kinetics with multi-analyte physiological validation
+            </p>
           </div>
         </div>
 
@@ -270,77 +291,383 @@ export const MetabolomicsInput: React.FC<Props> = ({
         <>
           {data.enabled ? (
             <div className="space-y-4">
-              {/* Primary Vitreous K+ Section */}
-              <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800/80 space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                  <span className="font-semibold text-slate-200 flex items-center gap-1.5 min-w-0">
-                    <FlaskConical className="w-3.5 h-3.5 text-teal-400 shrink-0" />
-                    <span className="truncate">Primary Marker: Vitreous Potassium Concentration ([K⁺])</span>
-                  </span>
-                  <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto min-w-0">
-                    <span className="text-teal-400 font-mono font-bold text-sm shrink-0">{k.toFixed(1)} mmol/L</span>
-                    {/* Dropdown Preset Selector */}
-                    <select
-                      value={k.toFixed(1)}
-                      onChange={(e) => onChange({ ...data, vitreousPotassiumMmolL: parseFloat(e.target.value) })}
-                      className="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-teal-500 w-full sm:w-auto max-w-full truncate min-w-0 cursor-pointer"
-                    >
-                      <option value="4.0">4.0 mmol/L (Baseline / ~0h)</option>
-                      <option value="5.5">5.5 mmol/L (Early / ~8h)</option>
-                      <option value="7.0">7.0 mmol/L (~16h)</option>
-                      <option value="8.5">8.5 mmol/L (~24h)</option>
-                      <option value="11.0">11.0 mmol/L (~37h)</option>
-                      <option value="14.0">14.0 mmol/L (~52h)</option>
-                      <option value="17.0">17.0 mmol/L (~68h)</option>
-                    </select>
+              {/* PRIMARY FORENSIC VITREOUS ELECTROLYTE TRIAD */}
+              <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-800/90 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-teal-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <FlaskConical className="w-4 h-4 text-teal-400" /> Standard Forensic Vitreous Triad ([K⁺], VUN, [Na⁺])
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      In forensic pathology, Vitreous Potassium ([K⁺]) cannot be accurately interpreted without concurrent VUN (uremia validator) and [Na⁺] (hydration validator).
+                    </p>
                   </div>
                 </div>
 
-                <input
-                  type="range"
-                  min="3.5"
-                  max="20.0"
-                  step="0.1"
-                  value={k}
-                  onChange={(e) => onChange({ ...data, vitreousPotassiumMmolL: parseFloat(e.target.value) })}
-                  className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-teal-400"
-                />
-                <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                  <span>3.5 mmol/L (Physiological)</span>
-                  <span>8.0 mmol/L (~21h)</span>
-                  <span>14.0 mmol/L (~52h)</span>
-                  <span>20.0 mmol/L (Max)</span>
+                {/* 1. Vitreous Potassium ([K+]) */}
+                <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <span className="font-semibold text-slate-200 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-teal-400"></span>
+                      <span>Primary Marker: Vitreous Potassium ([K⁺])</span>
+                      <span className="text-[10px] text-slate-400 font-normal">(Post-Mortem Autolysis Clock)</span>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-teal-400 font-mono font-bold text-sm">{k.toFixed(1)} mmol/L</span>
+                      <select
+                        value={k.toFixed(1)}
+                        onChange={(e) => onChange({ ...data, vitreousPotassiumMmolL: parseFloat(e.target.value) })}
+                        className="bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-1 focus:outline-none focus:border-teal-500 cursor-pointer"
+                      >
+                        <option value="4.0">4.0 mmol/L (Baseline / ~0h)</option>
+                        <option value="5.5">5.5 mmol/L (Early / ~8h)</option>
+                        <option value="7.0">7.0 mmol/L (~16h)</option>
+                        <option value="8.5">8.5 mmol/L (~24h)</option>
+                        <option value="11.0">11.0 mmol/L (~37h)</option>
+                        <option value="14.0">14.0 mmol/L (~52h)</option>
+                        <option value="17.0">17.0 mmol/L (~68h)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <input
+                    type="range"
+                    min="3.5"
+                    max="20.0"
+                    step="0.1"
+                    value={k}
+                    onChange={(e) => onChange({ ...data, vitreousPotassiumMmolL: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-teal-400"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                    <span>3.5 mmol/L (Physiological)</span>
+                    <span>8.0 mmol/L (~21h)</span>
+                    <span>14.0 mmol/L (~52h)</span>
+                    <span>20.0 mmol/L (Extreme autolysis)</span>
+                  </div>
                 </div>
 
-                {/* Method Comparison Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
-                  <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800 flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold text-slate-200">Madea Linear Formula</div>
-                      <div className="text-[11px] text-slate-400">Validated standard room temp</div>
+                {/* 2. Vitreous Urea Nitrogen (VUN) */}
+                <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <span className="font-semibold text-slate-200 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                      <span>Renal Validator: Vitreous Urea Nitrogen (VUN)</span>
+                      <span className="text-[10px] text-slate-400 font-normal">(Antemortem Azotemia / Uremia Guard)</span>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded border border-slate-700">
+                        <input
+                          type="number"
+                          min="8"
+                          max="120"
+                          step="1"
+                          value={vun}
+                          onChange={(e) => onChange({ ...data, ureaNitrogenMgDl: parseFloat(e.target.value) || 0 })}
+                          className="w-12 bg-transparent text-amber-300 font-mono font-bold text-xs focus:outline-none text-right"
+                        />
+                        <span className="text-slate-400 font-mono text-xs">mg/dL</span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                          vun > 35
+                            ? "bg-rose-950/80 text-rose-300 border border-rose-800"
+                            : vun > 28
+                            ? "bg-amber-950/80 text-amber-300 border border-amber-800"
+                            : "bg-emerald-950/80 text-emerald-300 border border-emerald-800"
+                        }`}
+                      >
+                        {vun > 35
+                          ? `Uremic Offset Active (-${result.kExcessSubtracted.toFixed(2)} mmol/L [K⁺])`
+                          : vun > 28
+                          ? "Mild Azotemia (29–35 mg/dL)"
+                          : "Normal (10–25 mg/dL) — Baseline Intact"}
+                      </span>
                     </div>
-                    <span className="font-mono text-teal-300 font-bold">{pmiMadea.toFixed(1)} h</span>
                   </div>
 
-                  <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800 flex items-center justify-between">
-                    <div>
-                      <div className="font-semibold text-slate-200">Sturner Regression Formula</div>
-                      <div className="text-[11px] text-slate-400">Validated extended interval</div>
+                  <input
+                    type="range"
+                    min="8"
+                    max="120"
+                    step="1"
+                    value={vun}
+                    onChange={(e) => onChange({ ...data, ureaNitrogenMgDl: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-slate-400">
+                    <span className="text-slate-500">Preset Scenarios:</span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => onChange({ ...data, ureaNitrogenMgDl: 18 })}
+                        className={`px-2 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-colors ${
+                          vun === 18 ? "bg-teal-700 text-white" : "bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800"
+                        }`}
+                      >
+                        18 mg/dL (Normal)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onChange({ ...data, ureaNitrogenMgDl: 32 })}
+                        className={`px-2 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-colors ${
+                          vun === 32 ? "bg-amber-700 text-white" : "bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800"
+                        }`}
+                      >
+                        32 mg/dL (Mild Azotemia)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onChange({ ...data, ureaNitrogenMgDl: 65 })}
+                        className={`px-2 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-colors ${
+                          vun === 65 ? "bg-rose-700 text-white" : "bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800"
+                        }`}
+                      >
+                        65 mg/dL (Uremic State)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onChange({ ...data, ureaNitrogenMgDl: 95 })}
+                        className={`px-2 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-colors ${
+                          vun === 95 ? "bg-rose-700 text-white" : "bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800"
+                        }`}
+                      >
+                        95 mg/dL (Severe Renal Failure)
+                      </button>
                     </div>
-                    <span className="font-mono text-teal-300 font-bold">{pmiSturner.toFixed(1)} h</span>
                   </div>
+                  <p className="text-[11px] text-slate-400">
+                    Vitreous urea nitrogen is stable post-mortem. Elevation &gt;30–35 mg/dL confirms antemortem azotemia, proving the decedent died with elevated baseline potassium (hyperkalemia) rather than post-mortem autolysis.
+                  </p>
+                </div>
+
+                {/* 3. Vitreous Sodium ([Na+]) */}
+                <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <span className="font-semibold text-slate-200 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                      <span>Hydration & Rate Validator: Vitreous Sodium ([Na⁺])</span>
+                      <span className="text-[10px] text-slate-400 font-normal">(Dehydration Guard & Linear Decline)</span>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded border border-slate-700">
+                        <input
+                          type="number"
+                          min="100"
+                          max="180"
+                          step="1"
+                          value={na}
+                          onChange={(e) => onChange({ ...data, vitreousSodiumMmolL: parseFloat(e.target.value) || 0 })}
+                          className="w-12 bg-transparent text-cyan-300 font-mono font-bold text-xs focus:outline-none text-right"
+                        />
+                        <span className="text-slate-400 font-mono text-xs">mmol/L</span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded ${
+                          na > 152
+                            ? "bg-amber-950/80 text-amber-300 border border-amber-800"
+                            : na < 125
+                            ? "bg-amber-950/80 text-amber-300 border border-amber-800"
+                            : "bg-emerald-950/80 text-emerald-300 border border-emerald-800"
+                        }`}
+                      >
+                        {na > 152
+                          ? `Hypernatremic Dehydration (÷${result.dehydrationRatio.toFixed(2)} [K⁺] factor)`
+                          : na < 125
+                          ? "Hyponatremic Dilution / Submersion"
+                          : `Normal Equilibrium (${result.naPmiEstimate ? `Coe Est: ~${result.naPmiEstimate}h` : "135–150 mmol/L"})`}
+                      </span>
+                    </div>
+                  </div>
+
+                  <input
+                    type="range"
+                    min="100"
+                    max="180"
+                    step="1"
+                    value={na}
+                    onChange={(e) => onChange({ ...data, vitreousSodiumMmolL: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-slate-400">
+                    <span className="text-slate-500">Preset Scenarios:</span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => onChange({ ...data, vitreousSodiumMmolL: 140 })}
+                        className={`px-2 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-colors ${
+                          na === 140 ? "bg-teal-700 text-white" : "bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800"
+                        }`}
+                      >
+                        140 mmol/L (Equilibrium)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onChange({ ...data, vitreousSodiumMmolL: 128 })}
+                        className={`px-2 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-colors ${
+                          na === 128 ? "bg-cyan-700 text-white" : "bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800"
+                        }`}
+                      >
+                        128 mmol/L (Coe Decline ~28h)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onChange({ ...data, vitreousSodiumMmolL: 165 })}
+                        className={`px-2 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-colors ${
+                          na === 165 ? "bg-amber-700 text-white" : "bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800"
+                        }`}
+                      >
+                        165 mmol/L (Severe Dehydration)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onChange({ ...data, vitreousSodiumMmolL: 115 })}
+                        className={`px-2 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-colors ${
+                          na === 115 ? "bg-rose-700 text-white" : "bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800"
+                        }`}
+                      >
+                        115 mmol/L (Water Intoxication / Dilution)
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Vitreous [Na⁺] normally undergoes slow post-mortem decline (~0.5 mmol/L per hour from 142 baseline). Severe dehydration (&gt;152 mmol/L) hemoconcentrates all vitreous solutes, falsely inflating potassium readings.
+                  </p>
                 </div>
               </div>
 
-              {/* Add Metabolite of Choice from Dropdown List */}
+              {/* INTERACTIVE BIOCHEMICAL IMPACT & KINETICS PIPELINE */}
+              <div className="bg-slate-950/80 p-4 rounded-xl border border-teal-900/60 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-teal-400" />
+                    <span>Dynamic Biochemical Correction & Formula Execution</span>
+                  </h4>
+                  {(result.kExcessSubtracted > 0 || result.dehydrationRatio > 1.0) && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800">
+                      Electrolyte Correction Active
+                    </span>
+                  )}
+                </div>
+
+                {/* Flow steps */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                  <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400 uppercase font-semibold">1. Measured [K⁺]</div>
+                    <div className="font-mono text-slate-200 font-bold text-sm mt-0.5">{k.toFixed(1)} mmol/L</div>
+                    <div className="text-[10px] text-slate-500">Raw lab aspiration</div>
+                  </div>
+
+                  <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400 uppercase font-semibold">2. VUN Uremic Offset</div>
+                    <div className={`font-mono font-bold text-sm mt-0.5 ${result.kExcessSubtracted > 0 ? "text-rose-400" : "text-slate-400"}`}>
+                      {result.kExcessSubtracted > 0 ? `-${result.kExcessSubtracted.toFixed(2)} mmol/L` : "0.00 mmol/L"}
+                    </div>
+                    <div className="text-[10px] text-slate-500">
+                      {result.kExcessSubtracted > 0 ? "Azotemic excess deducted" : "Baseline K intact"}
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
+                    <div className="text-[10px] text-slate-400 uppercase font-semibold">3. Hydration Factor</div>
+                    <div className={`font-mono font-bold text-sm mt-0.5 ${result.dehydrationRatio > 1.0 ? "text-amber-400" : "text-slate-400"}`}>
+                      {result.dehydrationRatio > 1.0 ? `÷${result.dehydrationRatio.toFixed(2)}` : "1.00×"}
+                    </div>
+                    <div className="text-[10px] text-slate-500">
+                      {result.dehydrationRatio > 1.0 ? "Solute hemoconcentration" : "Normal fluid balance"}
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-900/90 p-2.5 rounded-lg border border-teal-800/80 bg-teal-950/20">
+                    <div className="text-[10px] text-teal-400 uppercase font-semibold">4. Effective [K⁺] Applied</div>
+                    <div className="font-mono text-teal-300 font-bold text-sm mt-0.5">
+                      {result.effectivePotassiumMmolL.toFixed(2)} mmol/L
+                    </div>
+                    <div className="text-[10px] text-teal-400/70">Fed to Madea & Sturner</div>
+                  </div>
+                </div>
+
+                {/* Formula comparison grid with corrected vs uncorrected */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs pt-1">
+                  <div className="bg-slate-900/70 p-3 rounded-lg border border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <div className="font-semibold text-slate-200">Madea Linear Formula</div>
+                      <span className="font-mono text-teal-300 font-bold text-sm">{result.pmiMadea.toFixed(1)} h</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-1">PMI = 5.26 × ([K⁺] - 4.0)</div>
+                    {(result.kExcessSubtracted > 0 || result.dehydrationRatio > 1.0) && (
+                      <div className="text-[10px] text-amber-400/90 mt-1.5 pt-1.5 border-t border-slate-800">
+                        Raw uncorrected: <span className="font-mono">{rawPmiMadea.toFixed(1)}h</span>
+                        <span className="text-emerald-400 ml-1">
+                          ({Math.abs(rawPmiMadea - result.pmiMadea).toFixed(1)}h false overestimation avoided)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-900/70 p-3 rounded-lg border border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <div className="font-semibold text-slate-200">Sturner Regression</div>
+                      <span className="font-mono text-teal-300 font-bold text-sm">{result.pmiSturner.toFixed(1)} h</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-1">PMI = 7.14 × [K⁺] - 39.1</div>
+                    {(result.kExcessSubtracted > 0 || result.dehydrationRatio > 1.0) && (
+                      <div className="text-[10px] text-amber-400/90 mt-1.5 pt-1.5 border-t border-slate-800">
+                        Raw uncorrected: <span className="font-mono">{rawPmiSturner.toFixed(1)}h</span>
+                        <span className="text-emerald-400 ml-1">
+                          ({Math.abs(rawPmiSturner - result.pmiSturner).toFixed(1)}h false overestimation avoided)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-slate-900/70 p-3 rounded-lg border border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <div className="font-semibold text-slate-200">Coe [Na⁺] Decline Model</div>
+                      <span className="font-mono text-cyan-300 font-bold text-sm">
+                        {result.naPmiEstimate !== undefined ? `${result.naPmiEstimate.toFixed(1)} h` : "Equilibrium"}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-1">PMI ≈ (142 - [Na⁺]) / 0.5</div>
+                    <div className="text-[10px] text-slate-500 mt-1.5 pt-1.5 border-t border-slate-800">
+                      {result.naPmiEstimate !== undefined
+                        ? "Independent chronometer corroborating [K⁺]"
+                        : "[Na⁺] within antemortem equilibrium"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contextual Alert Banner if correction active */}
+                {result.kExcessSubtracted > 0 && (
+                  <div className="bg-rose-950/40 border border-rose-900/60 p-3 rounded-lg text-xs text-rose-200 flex items-start gap-2">
+                    <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Antemortem Uremia Correction Active (VUN = {vun} mg/dL):</span>{" "}
+                      Because antemortem baseline potassium was elevated by ~{result.kExcessSubtracted.toFixed(2)} mmol/L due to impaired renal excretion, using raw [K⁺] ({k.toFixed(1)} mmol/L) would have erroneously placed time of death {Math.abs(rawPmiMadea - result.pmiMadea).toFixed(1)} hours earlier than actual. Corrected effective [K⁺] ({result.effectivePotassiumMmolL.toFixed(2)} mmol/L) preserves forensic accuracy.
+                    </div>
+                  </div>
+                )}
+
+                {result.dehydrationRatio > 1.0 && (
+                  <div className="bg-amber-950/40 border border-amber-900/60 p-3 rounded-lg text-xs text-amber-200 flex items-start gap-2">
+                    <Droplets className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Hypernatremic Dehydration Correction Active ([Na⁺] = {na} mmol/L):</span>{" "}
+                      Severe fluid depletion hemoconcentrated vitreous humor solutes by a factor of {result.dehydrationRatio.toFixed(2)}×. The normalization algorithm counteracts artificial potassium elevation.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Add Secondary Research Metabolites */}
               <div className="bg-slate-950/60 p-4 rounded-xl border border-teal-900/40 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-teal-400" /> Add Metabolite of Your Choice
+                      <Sparkles className="w-3.5 h-3.5 text-teal-400" /> Additional Biochemical Analytes (Research Panel)
                     </h4>
                     <p className="text-[11px] text-slate-400">
-                      Select additional biochemical analytes from the dropdown list to refine interval accuracy
+                      Add supplementary markers (Hypoxanthine, Lactate, Glucose, Inosine, CSF) to expand multi-analyte consensus
                     </p>
                   </div>
 
@@ -350,7 +677,12 @@ export const MetabolomicsInput: React.FC<Props> = ({
                       onChange={(e) => setSelectedCatalogKey(e.target.value)}
                       className="bg-slate-900 border border-teal-700/60 text-slate-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-teal-400 cursor-pointer w-full sm:w-auto sm:min-w-[200px]"
                     >
-                      {METABOLITE_CATALOG.filter((m) => m.key !== "vitreous_potassium").map((cat) => (
+                      {METABOLITE_CATALOG.filter(
+                        (m) =>
+                          m.key !== "vitreous_potassium" &&
+                          m.key !== "urea_nitrogen" &&
+                          m.key !== "vitreous_sodium"
+                      ).map((cat) => (
                         <option key={cat.key} value={cat.key}>
                           {cat.name} ({cat.unit})
                         </option>
@@ -421,12 +753,12 @@ export const MetabolomicsInput: React.FC<Props> = ({
                               </div>
                             )}
 
-                            {/* Delete button */}
+                            {/* Delete Button */}
                             <button
                               type="button"
                               onClick={() => handleRemoveMetabolite(item.id)}
-                              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
-                              title="Remove analyte"
+                              className="p-2 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                              title="Remove metabolite"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -436,8 +768,8 @@ export const MetabolomicsInput: React.FC<Props> = ({
                     })}
                   </div>
                 ) : (
-                  <div className="p-3 rounded-lg bg-slate-900/40 border border-dashed border-slate-800 text-[11px] text-slate-500 text-center">
-                    No additional metabolites added yet. Choose from the dropdown list above (e.g. Hypoxanthine, Lactate, Glucose) to expand biochemical analysis.
+                  <div className="text-center py-3 text-slate-500 text-xs border border-dashed border-slate-800 rounded-xl">
+                    No secondary research analytes added. Use the dropdown above (e.g. Hypoxanthine, Lactate, Glucose) to include additional biochemical chronometers.
                   </div>
                 )}
               </div>

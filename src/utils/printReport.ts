@@ -1,6 +1,7 @@
 import { ForensicCaseInput, PmiCalculationResult, VisionDetectionData } from "../types";
 import { jsPDF } from "jspdf";
 import { runInBrowserXgbPrediction, InBrowserPredictionResult } from "./inBrowserXgbModel";
+import { auditPresetModifications } from "./presetAudit";
 
 /**
  * Generates high-fidelity, self-contained standalone HTML for case reports.
@@ -20,9 +21,16 @@ export function generateForensicReportHtml(
   // If mlData is not passed, run prediction dynamically
   const mlPrediction = mlData || runInBrowserXgbPrediction(caseData);
 
+  // Preset modification audit
+  const presetAudit = auditPresetModifications(caseData);
+
   // Gather non-unrelated photos if any
   const imagesList = visionData?.images || [];
   const forensicPhotos = imagesList.filter((img) => !img.isUnrelated);
+
+  // Examiner qualitative notes handling
+  const examinerNotesText = (visionData?.examinerNotes || caseData.examinersNotes || "").trim();
+  const hasExaminerNotes = examinerNotesText.length > 0 && examinerNotesText.toLowerCase() !== "none";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -378,7 +386,7 @@ export function generateForensicReportHtml(
 <body>
   <div class="report-container">
     <div class="print-bar">
-      <span><strong>VisionMortis Complete Forensic Dossier</strong> • Multi-System Corroboration by Protocol One</span>
+      <span><strong>VisionMortis Complete Forensic Report</strong> • Multi-System Corroboration by Protocol One</span>
       <button class="btn-print" onclick="window.print()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
         Print / Save PDF
@@ -433,19 +441,28 @@ export function generateForensicReportHtml(
     </div>
 
     <!-- Preset Reference Case Banner (if preset used) -->
-    ${caseData.presetName || caseData.isPresetCase ? `
-      <div style="background: rgba(13, 148, 136, 0.12); border: 1.5px solid rgba(45, 212, 191, 0.4); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 12px;">
-        <div style="background: rgba(45, 212, 191, 0.2); border-radius: 8px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #2dd4bf; flex-shrink: 0; margin-top: 1px;">📋</div>
+    ${presetAudit.isPreset ? `
+      <div style="background: ${presetAudit.isModified ? 'rgba(245, 158, 11, 0.12)' : 'rgba(13, 148, 136, 0.12)'}; border: 1.5px solid ${presetAudit.isModified ? 'rgba(245, 158, 11, 0.5)' : 'rgba(45, 212, 191, 0.4)'}; border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 12px;">
+        <div style="background: ${presetAudit.isModified ? 'rgba(245, 158, 11, 0.2)' : 'rgba(45, 212, 191, 0.2)'}; border-radius: 8px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: ${presetAudit.isModified ? '#fbbf24' : '#2dd4bf'}; flex-shrink: 0; margin-top: 1px;">📋</div>
         <div style="flex: 1;">
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: #2dd4bf; letter-spacing: 0.5px;">Preset Reference Case Profile:</span>
-            <span class="badge badge-teal">${caseData.presetCategory || "Benchmark Case"}</span>
-            ${caseData.isHarmonicPreset ? '<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border-color: rgba(16, 185, 129, 0.4);">✓ Harmonic Baseline (0 Discordance)</span>' : '<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border-color: rgba(245, 158, 11, 0.4);">Specialized Profile</span>'}
+            <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; color: ${presetAudit.isModified ? '#fbbf24' : '#2dd4bf'}; letter-spacing: 0.5px;">Preset Reference Case Profile:</span>
+            <span class="badge badge-teal">${presetAudit.presetCategory || caseData.presetCategory || "Benchmark Case"}</span>
+            ${presetAudit.isModified
+              ? `<span class="badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border-color: rgba(245, 158, 11, 0.5);">⚠️ Modified by Examiner (${presetAudit.modifiedCount} parameter adjustments)</span>`
+              : `<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border-color: rgba(16, 185, 129, 0.4);">✓ Original Unaltered Baseline</span>`
+            }
+            ${caseData.isHarmonicPreset && !presetAudit.isModified ? '<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border-color: rgba(16, 185, 129, 0.4);">✓ Harmonic Baseline (0 Discordance)</span>' : ''}
           </div>
           <div style="font-size: 13px; font-weight: 800; color: #f8fafc; margin-top: 4px;">
-            ${caseData.presetName || caseData.subjectNameOrIdentifier}
+            ${presetAudit.presetName || caseData.presetName || caseData.subjectNameOrIdentifier}
           </div>
           ${caseData.presetDescription ? `<div style="font-size: 11px; color: #cbd5e1; margin-top: 4px; line-height: 1.4;">${caseData.presetDescription}</div>` : ''}
+          ${presetAudit.isModified && presetAudit.modifiedFieldLabels.length > 0 ? `
+            <div style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(245, 158, 11, 0.35); font-size: 11px; color: #fbbf24;">
+              <strong>Examiner Modifications:</strong> ${presetAudit.modifiedFieldLabels.join(" • ")}
+            </div>
+          ` : ''}
         </div>
       </div>
     ` : ""}
@@ -468,6 +485,14 @@ export function generateForensicReportHtml(
         <div class="data-label">Scene Posture</div>
         <div class="data-value" style="text-transform: uppercase;">${caseData.bodyFoundPosition || "Supine"}</div>
       </div>
+      ${presetAudit.isPreset ? `
+        <div class="data-pill">
+          <div class="data-label">Preset Case Status</div>
+          <div class="data-value" style="font-size: 11.5px; color: ${presetAudit.isModified ? '#fbbf24' : '#34d399'};">
+            ${presetAudit.isModified ? `Modified (${presetAudit.modifiedCount} changes)` : 'Unaltered Baseline'}
+          </div>
+        </div>
+      ` : ''}
       <div class="data-pill">
         <div class="data-label">Ambient Temp</div>
         <div class="data-value" style="color: #2dd4bf;">${caseData.ambientTempC ?? 20} °C</div>
@@ -476,7 +501,7 @@ export function generateForensicReportHtml(
         <div class="data-label">Body Mass</div>
         <div class="data-value">${caseData.bodyWeightKg ?? 70} kg</div>
       </div>
-      <div class="data-pill" style="grid-column: span 2;">
+      <div class="data-pill" style="grid-column: span ${presetAudit.isPreset ? 1 : 2};">
         <div class="data-label">Discovery Location / Agency</div>
         <div class="data-value">${caseData.locationDescription || "Crime Scene"} • ${caseData.jurisdiction || "Division of Forensic Medicine"}</div>
       </div>
@@ -537,7 +562,10 @@ export function generateForensicReportHtml(
         <tbody>
           <!-- Algor -->
           <tr>
-            <td><strong style="color: #fb7185;">Algor Mortis</strong></td>
+            <td>
+              <strong style="color: #fb7185;">Algor Mortis</strong>
+              ${(caseData.algorMortis.recordedAt || caseData.indicatorTimings?.algor) ? `<div style="font-size: 9.5px; font-family: monospace; color: #94a3b8; margin-top: 2px;">Logged: ${caseData.algorMortis.recordedAt || caseData.indicatorTimings?.algor}</div>` : ""}
+            </td>
             <td>
               ${caseData.algorMortis.enabled
                 ? `Core Rectal: ${caseData.algorMortis.rectalTempC}°C | Ambient: ${caseData.ambientTempC}°C | Clothing: ${caseData.algorMortis.clothingCoveringFactor} (${caseData.algorMortis.clothingDescription || "Standard"}) | Air: ${caseData.algorMortis.airCurrentVelocity}`
@@ -555,7 +583,10 @@ export function generateForensicReportHtml(
 
           <!-- Livor -->
           <tr>
-            <td><strong style="color: #c084fc;">Livor Mortis</strong></td>
+            <td>
+              <strong style="color: #c084fc;">Livor Mortis</strong>
+              ${(caseData.livorMortis.recordedAt || caseData.indicatorTimings?.livor) ? `<div style="font-size: 9.5px; font-family: monospace; color: #94a3b8; margin-top: 2px;">Logged: ${caseData.livorMortis.recordedAt || caseData.indicatorTimings?.livor}</div>` : ""}
+            </td>
             <td>
               ${caseData.livorMortis.enabled
                 ? `Hue: ${caseData.livorMortis.colorHue} | Blanchability: ${caseData.livorMortis.blanchability.replace(/_/g, " ")} | Pattern: ${caseData.livorMortis.distributionPattern.replace(/_/g, " ")} ${caseData.livorMortis.suspectedBodyMovement ? "(Relocation Suspected)" : ""}`
@@ -573,7 +604,10 @@ export function generateForensicReportHtml(
 
           <!-- Rigor -->
           <tr>
-            <td><strong style="color: #fbbf24;">Rigor Mortis</strong></td>
+            <td>
+              <strong style="color: #fbbf24;">Rigor Mortis</strong>
+              ${(caseData.rigorMortis.recordedAt || caseData.indicatorTimings?.rigor) ? `<div style="font-size: 9.5px; font-family: monospace; color: #94a3b8; margin-top: 2px;">Logged: ${caseData.rigorMortis.recordedAt || caseData.indicatorTimings?.rigor}</div>` : ""}
+            </td>
             <td>
               ${caseData.rigorMortis.enabled
                 ? `Progression: ${caseData.rigorMortis.progressionStage.replace(/_/g, " ")} | Exertion: ${caseData.rigorMortis.preDeathPhysicalExertion.replace(/_/g, " ")} | Cold Stiffening: ${caseData.rigorMortis.coldStiffeningSuspected ? "Yes" : "None"}`
@@ -591,7 +625,10 @@ export function generateForensicReportHtml(
 
           <!-- Decomposition -->
           <tr>
-            <td><strong style="color: #34d399;">Decomposition / TBS</strong></td>
+            <td>
+              <strong style="color: #34d399;">Decomposition / TBS</strong>
+              ${(caseData.decomposition.recordedAt || caseData.indicatorTimings?.decomposition) ? `<div style="font-size: 9.5px; font-family: monospace; color: #94a3b8; margin-top: 2px;">Logged: ${caseData.decomposition.recordedAt || caseData.indicatorTimings?.decomposition}</div>` : ""}
+            </td>
             <td>
               ${caseData.decomposition.enabled
                 ? `TBS ${caseData.decomposition.totalBodyScore}/35 (Head ${caseData.decomposition.headNeckScore}, Trunk ${caseData.decomposition.trunkScore}, Limbs ${caseData.decomposition.limbsScore}) | Signs: ${[
@@ -614,7 +651,10 @@ export function generateForensicReportHtml(
 
           <!-- Entomology -->
           <tr>
-            <td><strong style="color: #2dd4bf;">Forensic Entomology</strong></td>
+            <td>
+              <strong style="color: #2dd4bf;">Forensic Entomology</strong>
+              ${(caseData.entomology.recordedAt || caseData.indicatorTimings?.entomology) ? `<div style="font-size: 9.5px; font-family: monospace; color: #94a3b8; margin-top: 2px;">Logged: ${caseData.entomology.recordedAt || caseData.indicatorTimings?.entomology}</div>` : ""}
+            </td>
             <td>
               ${caseData.entomology.enabled
                 ? `Taxon: ${caseData.entomology.primaryInsectGroup.replace(/_/g, " ")} | Stage: ${caseData.entomology.developmentalStage.replace(/_/g, " ")} | Length: ${caseData.entomology.larvalLengthMm}mm | Maggot Mass: ${caseData.entomology.maggotMassTempC}°C`
@@ -632,7 +672,10 @@ export function generateForensicReportHtml(
 
           <!-- Metabolomics -->
           <tr>
-            <td><strong style="color: #38bdf8;">Vitreous Metabolomics</strong></td>
+            <td>
+              <strong style="color: #38bdf8;">Vitreous Metabolomics</strong>
+              ${(caseData.metabolomics.recordedAt || caseData.indicatorTimings?.metabolomics) ? `<div style="font-size: 9.5px; font-family: monospace; color: #94a3b8; margin-top: 2px;">Logged: ${caseData.metabolomics.recordedAt || caseData.indicatorTimings?.metabolomics}</div>` : ""}
+            </td>
             <td>
               ${caseData.metabolomics.enabled
                 ? `[K⁺]: ${caseData.metabolomics.vitreousPotassiumMmolL} mmol/L (Madea/Sturner) ${caseData.metabolomics.vitreousHypoxanthineUmolL ? `| Hypoxanthine: ${caseData.metabolomics.vitreousHypoxanthineUmolL} µmol/L` : ""} ${caseData.metabolomics.suspectedRenalFailureOrTrauma ? "(Renal Caveat)" : ""}`
@@ -715,27 +758,27 @@ export function generateForensicReportHtml(
       ` : ""}
     </div>
 
-    <!-- 5. Photographic Evidence Log (if photos present) -->
-    ${forensicPhotos.length > 0 ? `
+    <!-- 5. Photographic Evidence & Vision Analysis Summary -->
+    ${forensicPhotos.length > 0 || (visionData && visionData.forensicObservations) ? `
       <div class="section-card">
         <div class="section-title">
-          <span>Photographic Evidence Log (${forensicPhotos.length} Attached)</span>
-          <span class="accent">Computer Vision Monitored</span>
+          <span>Photographic Evidence & Vision Analysis</span>
+          <span class="accent">${forensicPhotos.length} Forensic Photo(s) Evaluated</span>
         </div>
-        <div class="photo-grid">
-          ${forensicPhotos.map((img, idx) => `
-            <div class="photo-card">
-              <img src="${img.dataUrl}" alt="${img.name}" />
-              <div class="photo-info">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <strong style="color: #2dd4bf;">Photo #${idx + 1}</strong>
-                  <span class="badge badge-teal">${img.tag ? img.tag.replace(/_/g, " ") : "Scene"}</span>
-                </div>
-                <div style="font-weight: 700; color: #f8fafc; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${img.name}</div>
-                ${img.detectedFindings ? `<div style="color: #2dd4bf; font-size: 9.5px; margin-top: 3px;">AI: ${img.detectedFindings}</div>` : ""}
-              </div>
-            </div>
-          `).join("")}
+        <div style="background: #090d16; border: 1px solid #1e293b; border-radius: 8px; padding: 12px 14px; margin-top: 6px;">
+          <div style="font-size: 11px; font-weight: 700; color: #2dd4bf; margin-bottom: 4px;">
+            AI Vision Analysis Summary:
+          </div>
+          <div style="font-size: 11.5px; color: #e2e8f0; line-height: 1.55;">
+            ${visionData?.forensicObservations || `Visual photo analysis indicates ${visionData?.detectedDecompositionStage?.replace(/_/g, " ") || "fresh"} post-mortem changes (TBS ${visionData?.estimatedTbs?.totalScore || 3}/35) with ${visionData?.detectedLivor?.colorClassification?.replace(/_/g, " ") || "violaceous"} hypostasis and ${visionData?.detectedEntomology?.primaryInsectStage?.replace(/_/g, " ") || "no active"} insect colonization.`}
+          </div>
+          <div style="display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; padding-top: 8px; border-top: 1px solid #1e293b; font-size: 11px;">
+            <div><span style="color: #64748b;">Decomposition:</span> <strong style="color: #fbbf24;">${visionData?.detectedDecompositionStage?.replace(/_/g, " ") || "Indeterminate"} (TBS ${visionData?.estimatedTbs?.totalScore ?? "N/A"}/35)</strong></div>
+            <div><span style="color: #64748b;">Lividity:</span> <strong style="color: #c084fc;">${visionData?.detectedLivor?.colorClassification?.replace(/_/g, " ") || "Violaceous"} (${visionData?.detectedLivor?.distribution || "Dependent"})</strong></div>
+            <div><span style="color: #64748b;">Entomology:</span> <strong style="color: #34d399;">${visionData?.detectedEntomology?.primaryInsectStage?.replace(/_/g, " ") || "None"}</strong></div>
+            <div><span style="color: #64748b;">Body Movement:</span> <strong style="color: ${visionData?.detectedMovement?.suspectedMovement ? "#fb7185" : "#2dd4bf"};">${visionData?.detectedMovement?.suspectedMovement ? "SUSPECTED (Dual Discordance)" : "Consistent Posture"}</strong></div>
+            <div><span style="color: #64748b;">Evidence Metrics:</span> <strong style="color: #2dd4bf;">Clarity ${visionData?.averageClarityScore ?? 92}% | Reliability ${visionData?.averageReliabilityScore ?? 90}%</strong></div>
+          </div>
         </div>
       </div>
     ` : ""}
@@ -784,14 +827,14 @@ export function generateForensicReportHtml(
       </div>
     ` : ""}
 
-    <!-- 8. Examiner Qualitative Pathology Notes -->
-    ${caseData.examinersNotes ? `
+    <!-- 8. Examiner Qualitative Pathology Notes (Rendered ONLY if examiner provided notes) -->
+    ${hasExaminerNotes ? `
       <div class="section-card">
         <div class="section-title">
           <span>Examiner Qualitative Pathology Notes</span>
         </div>
-        <p style="font-size: 12px; color: #e2e8f0; line-height: 1.6; margin: 0;">
-          ${caseData.examinersNotes}
+        <p style="font-size: 12px; color: #e2e8f0; line-height: 1.6; margin: 0; white-space: pre-wrap;">
+          ${examinerNotesText}
         </p>
       </div>
     ` : ""}
@@ -923,8 +966,9 @@ export function exportForensicCaseReportPdf(
     renderHeader(1);
 
     // Section 1: Demographics Box
-    const hasPreset = Boolean(caseData.presetName || caseData.isPresetCase);
-    const demoBoxHeight = hasPreset ? 38 : 33;
+    const presetAudit = auditPresetModifications(caseData);
+    const hasPreset = Boolean(presetAudit.isPreset);
+    const demoBoxHeight = hasPreset ? (presetAudit.isModified ? 42 : 38) : 33;
     doc.setFillColor(15, 23, 42); // #0f172a
     doc.setDrawColor(30, 41, 59); // #1e293b
     doc.setLineWidth(0.3);
@@ -945,14 +989,28 @@ export function exportForensicCaseReportPdf(
 
     if (hasPreset) {
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(7.2);
-      doc.setTextColor(45, 212, 191);
-      doc.text(`PRESET REFERENCE:`, col1X, rowY);
+      doc.setFontSize(7.0);
+      if (presetAudit.isModified) {
+        doc.setTextColor(245, 158, 11);
+        doc.text(`PRESET [MODIFIED BY EXAMINER]:`, col1X, rowY);
+      } else {
+        doc.setTextColor(45, 212, 191);
+        doc.text(`PRESET [UNALTERED BASELINE]:`, col1X, rowY);
+      }
       doc.setFont("helvetica", "normal");
       doc.setTextColor(248, 250, 252);
-      const presetLabel = `${caseData.presetName || caseData.subjectNameOrIdentifier} [${caseData.presetCategory || "Benchmark"}]${caseData.isHarmonicPreset ? " (Harmonic 0 Discordance)" : ""}`;
-      doc.text(presetLabel.length > 70 ? presetLabel.substring(0, 68) + "..." : presetLabel, col1X + 32, rowY);
-      rowY += 4.2;
+      const presetLabel = `${presetAudit.presetName || caseData.presetName || caseData.subjectNameOrIdentifier} (${presetAudit.presetCategory || "Benchmark"})`;
+      doc.text(presetLabel.length > 55 ? presetLabel.substring(0, 53) + "..." : presetLabel, col1X + 46, rowY);
+      rowY += 3.8;
+
+      if (presetAudit.isModified && presetAudit.modifiedFieldLabels.length > 0) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(6.5);
+        doc.setTextColor(245, 158, 11);
+        const modText = `Modifications: ${presetAudit.modifiedFieldLabels.join("; ")}`;
+        doc.text(modText.length > 95 ? modText.substring(0, 92) + "..." : modText, col1X, rowY);
+        rowY += 3.8;
+      }
     }
 
     doc.setFont("helvetica", "normal");
@@ -1151,10 +1209,15 @@ export function exportForensicCaseReportPdf(
     y = 12;
     renderHeader(2);
 
+    const examinerNotesText = (visionData?.examinerNotes || caseData.examinersNotes || "").trim();
+    const hasExaminerNotes = examinerNotesText.length > 0 && examinerNotesText.toLowerCase() !== "none";
+    const imagesList = visionData?.images || [];
+    const forensicPhotos = imagesList.filter((img) => !img.isUnrelated);
+
     // Section 5: Complete 6 Forensic Module Inputs
     doc.setFillColor(15, 23, 42);
     doc.setDrawColor(30, 41, 59);
-    doc.roundedRect(margin, y, contentWidth, 74, 2, 2, "FD");
+    doc.roundedRect(margin, y, contentWidth, 64, 2, 2, "FD");
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
@@ -1163,43 +1226,43 @@ export function exportForensicCaseReportPdf(
 
     const mCol1 = margin + 3;
     const mCol2 = margin + (contentWidth / 2) + 2;
-    let mY = y + 9;
+    let mY = y + 8.5;
 
-    // Module 1: Algor
+    // Module 1: Algor & Livor
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
+    doc.setFontSize(7.0);
     doc.setTextColor(251, 113, 133); // #fb7185
-    doc.text("• Algor Mortis (Henssge Nomogram):", mCol1, mY);
+    doc.text(`• Algor Mortis:${caseData.algorMortis.recordedAt ? ` [${caseData.algorMortis.recordedAt}]` : ""}`, mCol1, mY);
     doc.setTextColor(192, 132, 252); // #c084fc
-    doc.text("• Livor Mortis (Hypostasis):", mCol2, mY);
-    mY += 3.8;
+    doc.text(`• Livor Mortis:${caseData.livorMortis.recordedAt ? ` [${caseData.livorMortis.recordedAt}]` : ""}`, mCol2, mY);
+    mY += 3.5;
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.8);
+    doc.setFontSize(6.5);
     doc.setTextColor(203, 213, 225);
     doc.text(`Core: ${caseData.algorMortis.enabled ? `${caseData.algorMortis.rectalTempC}°C` : "N/A"} | Ambient: ${caseData.ambientTempC}°C | Cf: ${caseData.algorMortis.clothingCoveringFactor}`, mCol1, mY);
     doc.text(`Blanching: ${caseData.livorMortis.enabled ? caseData.livorMortis.blanchability.replace(/_/g, " ") : "N/A"} | Hue: ${caseData.livorMortis.colorHue}`, mCol2, mY);
-    mY += 3.5;
+    mY += 3.2;
 
     doc.text(`Air Current: ${caseData.algorMortis.airCurrentVelocity} | Wet: ${caseData.algorMortis.isBodyWet ? "Yes" : "No"}`, mCol1, mY);
     doc.text(`Pattern: ${caseData.livorMortis.distributionPattern} | Movement: ${caseData.livorMortis.suspectedBodyMovement ? "SUSPECTED" : "None"}`, mCol2, mY);
-    mY += 5.5;
+    mY += 4.8;
 
     // Module 2: Rigor & Decomposition
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
+    doc.setFontSize(7.0);
     doc.setTextColor(251, 191, 36); // #fbbf24
-    doc.text("• Rigor Mortis (Nysten's Law):", mCol1, mY);
+    doc.text(`• Rigor Mortis:${caseData.rigorMortis.recordedAt ? ` [${caseData.rigorMortis.recordedAt}]` : ""}`, mCol1, mY);
     doc.setTextColor(52, 211, 153); // #34d399
-    doc.text("• Decomposition (TBS /35 & Morphologies):", mCol2, mY);
-    mY += 3.8;
+    doc.text(`• Decomposition:${caseData.decomposition.recordedAt ? ` [${caseData.decomposition.recordedAt}]` : ""}`, mCol2, mY);
+    mY += 3.5;
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.8);
+    doc.setFontSize(6.5);
     doc.setTextColor(203, 213, 225);
     doc.text(`Stage: ${caseData.rigorMortis.enabled ? caseData.rigorMortis.progressionStage.replace(/_/g, " ") : "N/A"} | Exertion: ${caseData.rigorMortis.preDeathPhysicalExertion}`, mCol1, mY);
     doc.text(`Total Score: TBS ${caseData.decomposition.enabled ? `${caseData.decomposition.totalBodyScore}/35` : "N/A"} (H:${caseData.decomposition.headNeckScore}, T:${caseData.decomposition.trunkScore}, L:${caseData.decomposition.limbsScore})`, mCol2, mY);
-    mY += 3.5;
+    mY += 3.2;
 
     doc.text(`Cold Stiffening: ${caseData.rigorMortis.coldStiffeningSuspected ? "Suspected" : "None"} | Jaw/Limbs: ${caseData.rigorMortis.muscleGroups.jawTemporomandibular ? "Y" : "N"}/${caseData.rigorMortis.muscleGroups.upperLimbsElbowsWrists ? "Y" : "N"}`, mCol1, mY);
     const decompSigns = [
@@ -1211,130 +1274,181 @@ export function exportForensicCaseReportPdf(
       caseData.decomposition.skeletonizationBoneExposed && "Bone",
     ].filter(Boolean).join(", ") || "Fresh";
     doc.text(`Morphology Signs: ${decompSigns}`, mCol2, mY);
-    mY += 5.5;
+    mY += 4.8;
 
     // Module 3: Entomology & Metabolomics
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
+    doc.setFontSize(7.0);
     doc.setTextColor(45, 212, 191); // #2dd4bf
-    doc.text("• Forensic Entomology (Insect Succession):", mCol1, mY);
+    doc.text(`• Entomology:${caseData.entomology.recordedAt ? ` [${caseData.entomology.recordedAt}]` : ""}`, mCol1, mY);
     doc.setTextColor(56, 189, 248); // #38bdf8
-    doc.text("• Vitreous Metabolomics & Biochemistry:", mCol2, mY);
-    mY += 3.8;
+    doc.text(`• Vitreous Metabolomics:${caseData.metabolomics.recordedAt ? ` [${caseData.metabolomics.recordedAt}]` : ""}`, mCol2, mY);
+    mY += 3.5;
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.8);
+    doc.setFontSize(6.5);
     doc.setTextColor(203, 213, 225);
     doc.text(`Taxon: ${caseData.entomology.enabled ? caseData.entomology.primaryInsectGroup.replace(/_/g, " ") : "N/A"} | Stage: ${caseData.entomology.developmentalStage}`, mCol1, mY);
     doc.text(`Vitreous [K+]: ${caseData.metabolomics.enabled ? `${caseData.metabolomics.vitreousPotassiumMmolL} mmol/L` : "N/A"}`, mCol2, mY);
-    mY += 3.5;
+    mY += 3.2;
 
     doc.text(`Larval Length: ${caseData.entomology.larvalLengthMm}mm | Maggot Temp: ${caseData.entomology.maggotMassTempC}°C | Access: ${caseData.entomology.indoorAccessDelayHours}h`, mCol1, mY);
     doc.text(`Hypoxanthine: ${caseData.metabolomics.vitreousHypoxanthineUmolL || "N/A"} µmol/L | Renal Caveat: ${caseData.metabolomics.suspectedRenalFailureOrTrauma ? "Present" : "None"}`, mCol2, mY);
 
-    y += 78;
+    y += 67;
 
-    // Section 6: Physiological Consistency & Discordance Alerts
+    // Section 6: Photographic Evidence & Vision Analysis Summary
+    if (forensicPhotos.length > 0 || (visionData && visionData.forensicObservations)) {
+      doc.setFillColor(15, 23, 42);
+      doc.setDrawColor(30, 41, 59);
+      doc.roundedRect(margin, y, contentWidth, 23, 2, 2, "FD");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(45, 212, 191);
+      doc.text(`6. PHOTOGRAPHIC EVIDENCE & COMPUTER VISION ANALYSIS (${forensicPhotos.length} PHOTOS EVALUATED)`, margin + 3, y + 4.5);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(203, 213, 225);
+      const visionSummary = visionData?.forensicObservations ||
+        `Photo inspection indicates ${visionData?.detectedDecompositionStage?.replace(/_/g, " ") || "fresh"} post-mortem changes (TBS ${visionData?.estimatedTbs?.totalScore || 3}/35) with ${visionData?.detectedLivor?.colorClassification?.replace(/_/g, " ") || "violaceous"} hypostasis and ${visionData?.detectedEntomology?.primaryInsectStage?.replace(/_/g, " ") || "no active"} insect colonization.`;
+      const splitVision = doc.splitTextToSize(visionSummary, contentWidth - 6);
+      doc.text(splitVision.slice(0, 2), margin + 3, y + 8.5);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(6.2);
+      doc.setTextColor(148, 163, 184);
+      doc.text(
+        `Findings: Decomp: ${visionData?.detectedDecompositionStage?.replace(/_/g, " ") || "Fresh"} (TBS ${visionData?.estimatedTbs?.totalScore || 3}/35)  |  Lividity: ${visionData?.detectedLivor?.colorClassification?.replace(/_/g, " ") || "Violaceous"}  |  Insects: ${visionData?.detectedEntomology?.primaryInsectStage?.replace(/_/g, " ") || "None"}  |  Movement: ${visionData?.detectedMovement?.suspectedMovement ? "SUSPECTED" : "Consistent"}  |  Clarity: ${visionData?.averageClarityScore ?? 92}%`,
+        margin + 3,
+        y + 19
+      );
+
+      y += 26;
+    }
+
+    // Section 7: Physiological Consistency & Discordance Alerts
     doc.setFillColor(15, 23, 42);
     doc.setDrawColor(30, 41, 59);
-    doc.roundedRect(margin, y, contentWidth, 26, 2, 2, "FD");
+    doc.roundedRect(margin, y, contentWidth, 23, 2, 2, "FD");
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
     doc.setTextColor(251, 113, 133);
-    doc.text("6. PHYSIOLOGICAL DISCORDANCE & CONTRADICTION AUDIT", margin + 3, y + 4.5);
+    doc.text("7. PHYSIOLOGICAL DISCORDANCE & CONTRADICTION AUDIT", margin + 3, y + 4.5);
 
     let discY = y + 8.5;
     if (result.inconsistencyAlerts && result.inconsistencyAlerts.length > 0) {
       result.inconsistencyAlerts.slice(0, 2).forEach((alert) => {
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(6.8);
+        doc.setFontSize(6.5);
         doc.setTextColor(251, 113, 133);
         doc.text(`[${alert.severity.toUpperCase()}] ${alert.title}`, margin + 3, discY);
-        discY += 3.0;
+        discY += 2.8;
 
         doc.setFont("helvetica", "normal");
         doc.setTextColor(253, 164, 175);
-        doc.text(alert.description.length > 95 ? alert.description.substring(0, 93) + "..." : alert.description, margin + 3, discY);
-        discY += 3.0;
+        doc.text(alert.description.length > 105 ? alert.description.substring(0, 103) + "..." : alert.description, margin + 3, discY);
+        discY += 2.8;
 
         doc.setTextColor(244, 63, 94);
-        doc.text(`Implication: ${alert.forensicImplication.length > 90 ? alert.forensicImplication.substring(0, 88) + "..." : alert.forensicImplication}`, margin + 3, discY);
-        discY += 3.2;
+        doc.text(`Implication: ${alert.forensicImplication.length > 100 ? alert.forensicImplication.substring(0, 98) + "..." : alert.forensicImplication}`, margin + 3, discY);
+        discY += 3.0;
       });
     } else {
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(7.5);
+      doc.setFontSize(7.2);
       doc.setTextColor(52, 211, 153);
       doc.text("✓ All physiological post-mortem indicators are in harmonic alignment. No contradictions detected.", margin + 3, discY + 2);
     }
 
-    y += 30;
+    y += 26;
 
-    // Section 7: AI Pathologist Synthesis
+    // Section 8: AI Pathologist Synthesis
     if (result.aiSynthesis) {
       doc.setFillColor(15, 23, 42);
       doc.setDrawColor(15, 118, 110);
-      doc.roundedRect(margin, y, contentWidth, 28, 2, 2, "FD");
+      doc.roundedRect(margin, y, contentWidth, 24, 2, 2, "FD");
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8.5);
       doc.setTextColor(45, 212, 191);
-      doc.text("7. AI PATHOLOGIST INTEGRATED SYNTHESIS", margin + 3, y + 4.5);
+      doc.text("8. AI PATHOLOGIST INTEGRATED SYNTHESIS", margin + 3, y + 4.5);
 
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(6.8);
+      doc.setFontSize(6.5);
       doc.setTextColor(203, 213, 225);
       const summaryText = result.aiSynthesis.expertSummary;
       const splitSummary = doc.splitTextToSize(summaryText, contentWidth - 6);
-      doc.text(splitSummary.slice(0, 3), margin + 3, y + 8.5);
+      doc.text(splitSummary.slice(0, 2), margin + 3, y + 8.5);
 
       if (result.aiSynthesis.recommendedConfirmatoryTests?.length > 0) {
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(6.5);
+        doc.setFontSize(6.2);
         doc.setTextColor(45, 212, 191);
-        doc.text(`Confirmatory: ${result.aiSynthesis.recommendedConfirmatoryTests.slice(0, 3).join(" • ")}`, margin + 3, y + 24);
+        doc.text(`Confirmatory: ${result.aiSynthesis.recommendedConfirmatoryTests.slice(0, 3).join(" • ")}`, margin + 3, y + 20);
       }
-      y += 32;
+      y += 27;
     }
 
-    // Section 8: Digital Chain of Custody & Examiner Sign-Off
+    // Section 9: Examiner Qualitative Pathology Notes (Rendered ONLY if examiner provided notes)
+    if (hasExaminerNotes) {
+      doc.setFillColor(15, 23, 42);
+      doc.setDrawColor(30, 41, 59);
+      doc.roundedRect(margin, y, contentWidth, 18, 2, 2, "FD");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(45, 212, 191);
+      doc.text("9. EXAMINER QUALITATIVE AUTOPSY NOTES", margin + 3, y + 4.5);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(203, 213, 225);
+      const splitNotes = doc.splitTextToSize(examinerNotesText, contentWidth - 6);
+      doc.text(splitNotes.slice(0, 2), margin + 3, y + 8.5);
+
+      y += 21;
+    }
+
+    // Section 10: Digital Chain of Custody & Examiner Sign-Off
     doc.setFillColor(15, 23, 42);
     doc.setDrawColor(30, 41, 59);
-    doc.roundedRect(margin, y, contentWidth, 34, 2, 2, "FD");
+    doc.roundedRect(margin, y, contentWidth, 30, 2, 2, "FD");
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.setTextColor(45, 212, 191);
-    doc.text("8. DIGITAL CHAIN OF CUSTODY & OFFICIAL PATHOLOGIST SIGN-OFF", margin + 3, y + 4.5);
+    doc.text("OFFICIAL PATHOLOGIST SIGN-OFF & DIGITAL CHAIN OF CUSTODY", margin + 3, y + 4.5);
 
     const sCol1 = margin + 3;
     const sCol2 = margin + (contentWidth / 2) + 2;
-    let signY = y + 9.5;
+    let signY = y + 9.0;
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.8);
+    doc.setFontSize(6.5);
     doc.setTextColor(148, 163, 184);
     doc.text("Attending Pathologist / Medical Examiner:", sCol1, signY);
     doc.text("Institutional Authority / Forensic Facility:", sCol2, signY);
-    signY += 4.5;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(248, 250, 252);
-    doc.text(caseData.investigatorName || caseData.examinerName || "Attending Medical Examiner", sCol1, signY);
-    doc.text(caseData.jurisdiction || "Division of Forensic Medicine & Pathology", sCol2, signY);
-    signY += 5.5;
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.8);
-    doc.setTextColor(148, 163, 184);
-    doc.text("Integrity Security Verification Hash (SHA-256):", sCol1, signY);
-    doc.text("Formal Execution Date & Time:", sCol2, signY);
-    signY += 4.5;
+    signY += 4.0;
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(7.2);
+    doc.setTextColor(248, 250, 252);
+    doc.text(caseData.investigatorName || caseData.examinerName || "Attending Medical Examiner", sCol1, signY);
+    doc.text(caseData.jurisdiction || "Division of Forensic Medicine & Pathology", sCol2, signY);
+    signY += 5.0;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text("Integrity Security Verification Hash (SHA-256):", sCol1, signY);
+    doc.text("Formal Execution Date & Time:", sCol2, signY);
+    signY += 4.0;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.8);
     doc.setTextColor(45, 212, 191);
     doc.text(integrityHash, sCol1, signY);
     doc.setTextColor(248, 250, 252);
