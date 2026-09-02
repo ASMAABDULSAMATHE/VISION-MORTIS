@@ -55,16 +55,14 @@ The model is evaluated using held-out synthetic data. These results demonstrate 
 The trained XGBoost model used in this prototype is included in this repository:
 
 - **Location:** [`XGBoost_SHAP/model.py`](XGBoost_SHAP/Model.py)
-- **Input:** Nine forensic indicators 
+- **Input:** Seven forensic indicators 
   1. Algor mortis
   2. Livor mortis
   3. Rigor mortis
   4. Decomposition stage
   5. Entomological evidence
-  6. Environmental temperature
+  6. Environmental conditions -temperature & humidity
   7. Metabolites
-  8. Body movement
-  9. Scene photographs
 
 - **Output:** PMI point estimate with confidence interval, inconsistency alert and contributing factors
 
