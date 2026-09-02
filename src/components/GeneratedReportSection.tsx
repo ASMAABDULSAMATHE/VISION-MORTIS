@@ -192,13 +192,10 @@ FORENSIC INDICATOR MODULE EVALUATION & INPUTS:
    • Maggot Mass Temp:    ${caseData.entomology.enabled ? `${caseData.entomology.maggotMassTempC} °C` : "N/A"}
    • Indoor Access Delay: ${caseData.entomology.enabled ? `${caseData.entomology.indoorAccessDelayHours} hours` : "N/A"}
 
-6. VITREOUS METABOLOMICS & BIOCHEMISTRY:
+6. METABOLOMICS MULTI-ANALYTE PANEL:
    • Status:              ${caseData.metabolomics.enabled ? "ACTIVE" : "BYPASSED / OFF"}
    • Logged Timestamp:    ${caseData.metabolomics.recordedAt || caseData.indicatorTimings?.metabolomics || "N/A"}
-   • Vitreous [K+]:       ${caseData.metabolomics.enabled ? `${caseData.metabolomics.vitreousPotassiumMmolL} mmol/L` : "N/A"}
-   • Vitreous Hypoxanthine:${caseData.metabolomics.enabled && caseData.metabolomics.vitreousHypoxanthineUmolL ? `${caseData.metabolomics.vitreousHypoxanthineUmolL} µmol/L` : "N/A"}
-   • Active Metabolites:  ${caseData.metabolomics.enabled && caseData.metabolomics.activeMetabolites?.length ? caseData.metabolomics.activeMetabolites.map(m => `${m.name}: ${m.value} ${m.unit}`).join("; ") : "Standard vitreous panel"}
-   • Renal Disease/Trauma:${caseData.metabolomics.enabled ? (caseData.metabolomics.suspectedRenalFailureOrTrauma ? "SUSPECTED (K+ ELEVATION CAVEAT)" : "None") : "N/A"}
+   • Active Analytes:     ${caseData.metabolomics.enabled ? (caseData.metabolomics.selectedMetabolites?.length ? `${caseData.metabolomics.selectedMetabolites.length} of 11 markers (${caseData.metabolomics.selectedMetabolites.map(m => `${m.name}: ${m.measuredValue} ${m.unit}`).join("; ")})` : "None loaded") : "N/A"}
 
 --------------------------------------------------------------------------------
 PHOTOGRAPHIC EVIDENCE & VISION ANALYSIS:
@@ -1100,14 +1097,10 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
               </div>
               {caseData.metabolomics.enabled ? (
                 <div className="space-y-1 text-slate-400 font-mono text-[11px]">
-                  <div>Vitreous [K⁺]: <span className="text-slate-200 font-bold">{caseData.metabolomics.vitreousPotassiumMmolL} mmol/L</span></div>
-                  {caseData.metabolomics.vitreousHypoxanthineUmolL && (
-                    <div>Vitreous Hypoxanthine: <span className="text-slate-200">{caseData.metabolomics.vitreousHypoxanthineUmolL} µmol/L</span></div>
+                  <div>Active Analytes: <span className="text-slate-200 font-bold">{caseData.metabolomics.selectedMetabolites?.length || 0} of 11 Panel Markers</span></div>
+                  {caseData.metabolomics.selectedMetabolites && caseData.metabolomics.selectedMetabolites.length > 0 && (
+                    <div className="line-clamp-2">Markers: <span className="text-slate-300">{caseData.metabolomics.selectedMetabolites.map(m => `${m.name} (${m.measuredValue} ${m.unit})`).join(", ")}</span></div>
                   )}
-                  {caseData.metabolomics.activeMetabolites && caseData.metabolomics.activeMetabolites.length > 0 && (
-                    <div>Active Analytes: <span className="text-slate-200">{caseData.metabolomics.activeMetabolites.map(m => `${m.name} (${m.value} ${m.unit})`).join(", ")}</span></div>
-                  )}
-                  <div>Renal Disease Caveat: <span className="text-slate-200">{caseData.metabolomics.suspectedRenalFailureOrTrauma ? "Present" : "None"}</span></div>
                 </div>
               ) : (
                 <div className="text-slate-500 italic">Not utilized in final composite.</div>

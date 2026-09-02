@@ -800,13 +800,35 @@ export default function App() {
                       {presetAudit.isPreset && (
                         <div className="mt-1">
                           {presetAudit.isModified ? (
-                            <div className="p-1.5 rounded-lg bg-amber-950/60 border border-amber-800/80 text-[10px] space-y-0.5">
-                              <div className="text-amber-300 font-bold flex items-center gap-1">
-                                <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
-                                <span>Modified by Examiner ({presetAudit.modifiedCount} Δ)</span>
+                            <div className="p-2 rounded-lg bg-amber-950/60 border border-amber-800/80 text-[10px] space-y-1">
+                              <div className="text-amber-300 font-bold flex items-center justify-between gap-1">
+                                <span className="flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0" />
+                                  <span>Modified ({presetAudit.modifiedCount} parameter{presetAudit.modifiedCount !== 1 ? "s" : ""})</span>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const orig = FORENSIC_PRESETS.find(
+                                      (p) => (caseData.presetId && p.presetId === caseData.presetId) || p.caseId === caseData.caseId
+                                    );
+                                    if (orig) {
+                                      setCaseData(orig);
+                                      setAiSynthesisData(null);
+                                    }
+                                  }}
+                                  className="text-[9px] text-amber-200 hover:text-white underline cursor-pointer"
+                                  title="Revert to baseline preset"
+                                >
+                                  Revert
+                                </button>
                               </div>
-                              <div className="text-amber-200/80 text-[9px] truncate" title={presetAudit.modifiedFieldLabels.join(", ")}>
-                                {presetAudit.modifiedFieldLabels.slice(0, 2).join(", ")}{presetAudit.modifiedFieldLabels.length > 2 ? "..." : ""}
+                              <div className="text-amber-200/90 text-[9.5px] font-mono space-y-0.5 pt-0.5 max-h-24 overflow-y-auto">
+                                {presetAudit.modifiedFieldLabels.map((diff, idx) => (
+                                  <div key={idx} className="bg-amber-900/40 px-1.5 py-0.5 rounded leading-tight">
+                                    {diff}
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           ) : (
@@ -1009,14 +1031,40 @@ export default function App() {
                 </div>
 
                 {presetAudit.isModified && (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-950/60 border border-amber-800/80 text-amber-300 text-xs w-full sm:w-auto">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    <span className="font-semibold">
-                      {presetAudit.modifiedCount} Examiner Change{presetAudit.modifiedCount !== 1 ? "s" : ""} Active:
-                    </span>
-                    <span className="text-amber-200/90 font-mono text-[11px] truncate max-w-[220px] lg:max-w-xs" title={presetAudit.modifiedFieldLabels.join("; ")}>
-                      {presetAudit.modifiedFieldLabels.join(", ")}
-                    </span>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-950/70 border border-amber-800/80 text-amber-300 text-xs w-full sm:w-auto">
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span className="font-semibold whitespace-nowrap">
+                        {presetAudit.modifiedCount} Examiner Change{presetAudit.modifiedCount !== 1 ? "s" : ""} Active:
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {presetAudit.modifiedFieldLabels.map((diff, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 text-amber-200 font-mono text-[11px] px-2 py-0.5 rounded-md bg-amber-900/60 border border-amber-700/60"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                          <span>{diff}</span>
+                        </span>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const orig = FORENSIC_PRESETS.find(
+                          (p) => (caseData.presetId && p.presetId === caseData.presetId) || p.caseId === caseData.caseId
+                        );
+                        if (orig) {
+                          setCaseData(orig);
+                          setAiSynthesisData(null);
+                        }
+                      }}
+                      className="text-[10px] text-amber-200 hover:text-white underline cursor-pointer font-medium ml-auto sm:ml-2 shrink-0"
+                      title="Revert all changes back to original preset baseline"
+                    >
+                      Revert Baseline
+                    </button>
                   </div>
                 )}
 

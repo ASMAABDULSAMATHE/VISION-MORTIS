@@ -106,6 +106,9 @@ export function auditPresetModifications(caseData: ForensicCaseInput): PresetAud
     if (caseData.algorMortis.clothingCoveringFactor !== baseline.algorMortis.clothingCoveringFactor) {
       diffs.push(`Clothing Factor (${baseline.algorMortis.clothingCoveringFactor} → ${caseData.algorMortis.clothingCoveringFactor})`);
     }
+    if (caseData.algorMortis.clothingDescription && baseline.algorMortis.clothingDescription && caseData.algorMortis.clothingDescription !== baseline.algorMortis.clothingDescription) {
+      diffs.push(`Clothing (${baseline.algorMortis.clothingDescription} → ${caseData.algorMortis.clothingDescription})`);
+    }
     if (caseData.algorMortis.isBodyWet !== baseline.algorMortis.isBodyWet) {
       diffs.push(`Body Wet (${baseline.algorMortis.isBodyWet ? "Yes" : "No"} → ${caseData.algorMortis.isBodyWet ? "Yes" : "No"})`);
     }
@@ -122,10 +125,13 @@ export function auditPresetModifications(caseData: ForensicCaseInput): PresetAud
       diffs.push(`Livor Blanchability (${baseline.livorMortis.blanchability.replace(/_/g, " ")} → ${caseData.livorMortis.blanchability.replace(/_/g, " ")})`);
     }
     if (caseData.livorMortis.colorHue !== baseline.livorMortis.colorHue) {
-      diffs.push(`Livor Color (${baseline.livorMortis.colorHue} → ${caseData.livorMortis.colorHue})`);
+      diffs.push(`Livor Color (${baseline.livorMortis.colorHue.replace(/_/g, " ")} → ${caseData.livorMortis.colorHue.replace(/_/g, " ")})`);
     }
     if (caseData.livorMortis.distributionPattern !== baseline.livorMortis.distributionPattern) {
       diffs.push(`Livor Distribution (${baseline.livorMortis.distributionPattern.replace(/_/g, " ")} → ${caseData.livorMortis.distributionPattern.replace(/_/g, " ")})`);
+    }
+    if (caseData.livorMortis.lividityPositionFound !== baseline.livorMortis.lividityPositionFound) {
+      diffs.push(`Lividity Posture (${baseline.livorMortis.lividityPositionFound} → ${caseData.livorMortis.lividityPositionFound})`);
     }
     if (caseData.livorMortis.suspectedBodyMovement !== baseline.livorMortis.suspectedBodyMovement) {
       diffs.push(`Livor Movement Flag (${baseline.livorMortis.suspectedBodyMovement ? "Yes" : "No"} → ${caseData.livorMortis.suspectedBodyMovement ? "Yes" : "No"})`);
@@ -154,11 +160,32 @@ export function auditPresetModifications(caseData: ForensicCaseInput): PresetAud
     if (caseData.decomposition.totalBodyScore !== baseline.decomposition.totalBodyScore) {
       diffs.push(`Total Body Score (${baseline.decomposition.totalBodyScore} → ${caseData.decomposition.totalBodyScore})`);
     }
+    if (caseData.decomposition.headNeckScore !== undefined && baseline.decomposition.headNeckScore !== undefined && caseData.decomposition.headNeckScore !== baseline.decomposition.headNeckScore) {
+      diffs.push(`Head/Neck Score (${baseline.decomposition.headNeckScore} → ${caseData.decomposition.headNeckScore})`);
+    }
+    if (caseData.decomposition.trunkScore !== undefined && baseline.decomposition.trunkScore !== undefined && caseData.decomposition.trunkScore !== baseline.decomposition.trunkScore) {
+      diffs.push(`Trunk Score (${baseline.decomposition.trunkScore} → ${caseData.decomposition.trunkScore})`);
+    }
+    if (caseData.decomposition.limbsScore !== undefined && baseline.decomposition.limbsScore !== undefined && caseData.decomposition.limbsScore !== baseline.decomposition.limbsScore) {
+      diffs.push(`Limbs Score (${baseline.decomposition.limbsScore} → ${caseData.decomposition.limbsScore})`);
+    }
     if (caseData.decomposition.marblingPresent !== baseline.decomposition.marblingPresent) {
       diffs.push(`Marbling (${baseline.decomposition.marblingPresent ? "Yes" : "No"} → ${caseData.decomposition.marblingPresent ? "Yes" : "No"})`);
     }
     if (caseData.decomposition.bloatingAndPurge !== baseline.decomposition.bloatingAndPurge) {
       diffs.push(`Bloating/Purge (${baseline.decomposition.bloatingAndPurge ? "Yes" : "No"} → ${caseData.decomposition.bloatingAndPurge ? "Yes" : "No"})`);
+    }
+    if (caseData.decomposition.skinSlippageBullae !== undefined && baseline.decomposition.skinSlippageBullae !== undefined && caseData.decomposition.skinSlippageBullae !== baseline.decomposition.skinSlippageBullae) {
+      diffs.push(`Skin Slippage (${baseline.decomposition.skinSlippageBullae ? "Yes" : "No"} → ${caseData.decomposition.skinSlippageBullae ? "Yes" : "No"})`);
+    }
+    if (caseData.decomposition.mummificationOrAdipocere !== undefined && baseline.decomposition.mummificationOrAdipocere !== undefined && caseData.decomposition.mummificationOrAdipocere !== baseline.decomposition.mummificationOrAdipocere) {
+      diffs.push(`Mummification/Adipocere (${baseline.decomposition.mummificationOrAdipocere ? "Yes" : "No"} → ${caseData.decomposition.mummificationOrAdipocere ? "Yes" : "No"})`);
+    }
+    if (caseData.decomposition.skeletonizationBoneExposed !== undefined && baseline.decomposition.skeletonizationBoneExposed !== undefined && caseData.decomposition.skeletonizationBoneExposed !== baseline.decomposition.skeletonizationBoneExposed) {
+      diffs.push(`Skeletonization (${baseline.decomposition.skeletonizationBoneExposed ? "Yes" : "No"} → ${caseData.decomposition.skeletonizationBoneExposed ? "Yes" : "No"})`);
+    }
+    if (caseData.decomposition.effectiveMeanTempC !== undefined && baseline.decomposition.effectiveMeanTempC !== undefined && caseData.decomposition.effectiveMeanTempC !== baseline.decomposition.effectiveMeanTempC) {
+      diffs.push(`Decomp Effective Temp (${baseline.decomposition.effectiveMeanTempC}°C → ${caseData.decomposition.effectiveMeanTempC}°C)`);
     }
   }
 
@@ -172,14 +199,69 @@ export function auditPresetModifications(caseData: ForensicCaseInput): PresetAud
     if (caseData.entomology.primaryInsectGroup !== baseline.entomology.primaryInsectGroup) {
       diffs.push(`Insect Taxon (${baseline.entomology.primaryInsectGroup.replace(/_/g, " ")} → ${caseData.entomology.primaryInsectGroup.replace(/_/g, " ")})`);
     }
+    if (caseData.entomology.larvalLengthMm !== baseline.entomology.larvalLengthMm) {
+      diffs.push(`Larval Length (${baseline.entomology.larvalLengthMm}mm → ${caseData.entomology.larvalLengthMm}mm)`);
+    }
+    if (caseData.entomology.maggotMassTempC !== baseline.entomology.maggotMassTempC) {
+      diffs.push(`Maggot Mass Temp (${baseline.entomology.maggotMassTempC}°C → ${caseData.entomology.maggotMassTempC}°C)`);
+    }
+    if (caseData.entomology.indoorAccessDelayHours !== baseline.entomology.indoorAccessDelayHours) {
+      diffs.push(`Access Delay (${baseline.entomology.indoorAccessDelayHours}h → ${caseData.entomology.indoorAccessDelayHours}h)`);
+    }
   }
 
-  // Metabolomics
+  // Metabolomics & Vitreous Chemistry
   if (caseData.metabolomics.enabled !== baseline.metabolomics.enabled) {
     diffs.push(`Metabolomics (${baseline.metabolomics.enabled ? "Active" : "Bypassed"} → ${caseData.metabolomics.enabled ? "Active" : "Bypassed"})`);
   } else if (caseData.metabolomics.enabled) {
     if (caseData.metabolomics.vitreousPotassiumMmolL !== baseline.metabolomics.vitreousPotassiumMmolL) {
       diffs.push(`Vitreous [K+] (${baseline.metabolomics.vitreousPotassiumMmolL} → ${caseData.metabolomics.vitreousPotassiumMmolL} mmol/L)`);
+    }
+
+    const baseVun = baseline.metabolomics.ureaNitrogenMgDl ?? 18;
+    const currVun = caseData.metabolomics.ureaNitrogenMgDl ?? 18;
+    if (currVun !== baseVun) {
+      diffs.push(`VUN (${baseVun} → ${currVun} mg/dL)`);
+    }
+
+    const baseNa = baseline.metabolomics.vitreousSodiumMmolL ?? 140;
+    const currNa = caseData.metabolomics.vitreousSodiumMmolL ?? 140;
+    if (currNa !== baseNa) {
+      diffs.push(`Vitreous [Na+] (${baseNa} → ${currNa} mmol/L)`);
+    }
+
+    if (caseData.metabolomics.vitreousHypoxanthineUmolL !== undefined && baseline.metabolomics.vitreousHypoxanthineUmolL !== undefined && caseData.metabolomics.vitreousHypoxanthineUmolL !== baseline.metabolomics.vitreousHypoxanthineUmolL) {
+      diffs.push(`Hypoxanthine (${baseline.metabolomics.vitreousHypoxanthineUmolL} → ${caseData.metabolomics.vitreousHypoxanthineUmolL} µmol/L)`);
+    }
+
+    if (caseData.metabolomics.vitreousLactateMmolL !== undefined && baseline.metabolomics.vitreousLactateMmolL !== undefined && caseData.metabolomics.vitreousLactateMmolL !== baseline.metabolomics.vitreousLactateMmolL) {
+      diffs.push(`Lactate (${baseline.metabolomics.vitreousLactateMmolL} → ${caseData.metabolomics.vitreousLactateMmolL} mmol/L)`);
+    }
+
+    if (caseData.metabolomics.suspectedRenalFailureOrTrauma !== baseline.metabolomics.suspectedRenalFailureOrTrauma) {
+      diffs.push(`Renal Guard (${baseline.metabolomics.suspectedRenalFailureOrTrauma ? "Active" : "Off"} → ${caseData.metabolomics.suspectedRenalFailureOrTrauma ? "Active" : "Off"})`);
+    }
+
+    // Check individual selected metabolites
+    const baseMetabs = baseline.metabolomics.selectedMetabolites || [];
+    const currMetabs = caseData.metabolomics.selectedMetabolites || [];
+
+    // Check added or updated metabolites
+    for (const curr of currMetabs) {
+      const match = baseMetabs.find((b) => b.metaboliteKey === curr.metaboliteKey || b.id === curr.id);
+      if (!match) {
+        diffs.push(`Added ${curr.name} (${curr.measuredValue} ${curr.unit})`);
+      } else if (match.measuredValue !== curr.measuredValue) {
+        diffs.push(`${curr.name} (${match.measuredValue} → ${curr.measuredValue} ${curr.unit})`);
+      }
+    }
+
+    // Check removed metabolites
+    for (const baseItem of baseMetabs) {
+      const existsInCurr = currMetabs.some((c) => c.metaboliteKey === baseItem.metaboliteKey || c.id === baseItem.id);
+      if (!existsInCurr) {
+        diffs.push(`Removed ${baseItem.name}`);
+      }
     }
   }
 
@@ -195,7 +277,7 @@ export function auditPresetModifications(caseData: ForensicCaseInput): PresetAud
     modifiedCount: diffs.length,
     modifiedFieldLabels: diffs,
     auditSummaryText: isModified
-      ? `Modified by Examiner: ${diffs.length} parameter(s) adjusted from benchmark baseline (${diffs.slice(0, 3).join("; ")}${diffs.length > 3 ? ` +${diffs.length - 3} more` : ""}).`
+      ? `Modified by Examiner: ${diffs.length} parameter(s) adjusted from benchmark baseline (${diffs.join("; ")}).`
       : "Unaltered Benchmark Baseline: All forensic parameters match the original standardized case preset.",
     shortStatusBadge: isModified ? `Preset (Modified by Examiner - ${diffs.length} Δ)` : "Preset (Original Baseline)",
     statusColor: isModified ? "amber" : "emerald",

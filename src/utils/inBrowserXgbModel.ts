@@ -423,21 +423,67 @@ export function extractXgbFeatureVector(caseData: CaseDataInput): {
   setContinuousFeature("insect_species_confidence", insectPresent ? 85.0 : null, 80.0);
   setContinuousFeature("insect_stage_confidence", insectPresent ? 88.0 : null, 80.0);
 
-  // Metabolomics features
-  setContinuousFeature("hypoxanthine_umol_L", metab.vitreousHypoxanthineUmolL ?? (metab.enabled ? 80.0 : null), 80.0);
-  setContinuousFeature("lactic_acid_mmol_L", metab.vitreousLactateMmolL ?? (metab.enabled ? 12.0 : null), 12.0);
-  setContinuousFeature("choline_umol_L", metab.enabled ? 40.0 : null, 40.0);
-  setContinuousFeature("taurine_umol_L", metab.enabled ? 60.0 : null, 60.0);
-  setContinuousFeature("glycerol_umol_L", metab.enabled ? 110.0 : null, 110.0);
-  setContinuousFeature("succinic_acid_umol_L", metab.enabled ? 30.0 : null, 30.0);
-  setContinuousFeature("formic_acid_umol_L", metab.enabled ? 15.0 : null, 15.0);
-  setContinuousFeature("uric_acid_umol_L", metab.enabled ? 320.0 : null, 320.0);
-  setContinuousFeature("creatine_umol_L", metab.enabled ? 200.0 : null, 200.0);
-  setContinuousFeature("putrescine_nmol_g", metab.enabled ? 40.0 : null, 40.0);
-  setContinuousFeature("cadaverine_nmol_g", metab.enabled ? 55.0 : null, 55.0);
+  // Metabolomics features (11-analyte XGBoost panel)
+  const getMetaboliteVal = (keys: string[]): number | null => {
+    if (!metab.enabled) return null;
+    const found = metab.selectedMetabolites?.find((m) => keys.includes(m.metaboliteKey));
+    if (found && typeof found.measuredValue === "number" && !isNaN(found.measuredValue)) {
+      return found.measuredValue;
+    }
+    return null;
+  };
+
+  const hypoxanthineVal = metab.vitreousHypoxanthineUmolL ?? getMetaboliteVal(["vitreous_hypoxanthine", "hypoxanthine"]) ?? (metab.enabled ? 80.0 : null);
+  setContinuousFeature("hypoxanthine_umol_L", hypoxanthineVal, 80.0);
+
+  const lactateVal = metab.vitreousLactateMmolL ?? getMetaboliteVal(["vitreous_lactate", "lactic_acid"]) ?? (metab.enabled ? 12.0 : null);
+  setContinuousFeature("lactic_acid_mmol_L", lactateVal, 12.0);
+
+  const cholineVal = getMetaboliteVal(["choline", "vitreous_choline"]) ?? (metab.enabled ? 40.0 : null);
+  setContinuousFeature("choline_umol_L", cholineVal, 40.0);
+
+  const taurineVal = getMetaboliteVal(["taurine", "vitreous_taurine"]) ?? (metab.enabled ? 60.0 : null);
+  setContinuousFeature("taurine_umol_L", taurineVal, 60.0);
+
+  const glycerolVal = getMetaboliteVal(["glycerol", "vitreous_glycerol"]) ?? (metab.enabled ? 110.0 : null);
+  setContinuousFeature("glycerol_umol_L", glycerolVal, 110.0);
+
+  const succinicVal = getMetaboliteVal(["succinic_acid", "succinate"]) ?? (metab.enabled ? 30.0 : null);
+  setContinuousFeature("succinic_acid_umol_L", succinicVal, 30.0);
+
+  const formicVal = getMetaboliteVal(["formic_acid", "formate"]) ?? (metab.enabled ? 15.0 : null);
+  setContinuousFeature("formic_acid_umol_L", formicVal, 15.0);
+
+  const uricVal = getMetaboliteVal(["uric_acid", "urate"]) ?? (metab.enabled ? 320.0 : null);
+  setContinuousFeature("uric_acid_umol_L", uricVal, 320.0);
+
+  const creatineVal = getMetaboliteVal(["creatine"]) ?? (metab.enabled ? 200.0 : null);
+  setContinuousFeature("creatine_umol_L", creatineVal, 200.0);
+
+  const putrescineVal = getMetaboliteVal(["putrescine"]) ?? (metab.enabled ? 40.0 : null);
+  setContinuousFeature("putrescine_nmol_g", putrescineVal, 40.0);
+
+  const cadaverineVal = getMetaboliteVal(["cadaverine"]) ?? (metab.enabled ? 55.0 : null);
+  setContinuousFeature("cadaverine_nmol_g", cadaverineVal, 55.0);
 
   setContinuousFeature("metabolomics_available", metab.enabled ? 1 : 0, 0);
-  setContinuousFeature("metabolomics_missing_feature_count", metab.enabled ? 2 : 11, 4);
+
+  const activeMetabCount = [
+    metab.vitreousHypoxanthineUmolL ?? getMetaboliteVal(["vitreous_hypoxanthine", "hypoxanthine"]),
+    metab.vitreousLactateMmolL ?? getMetaboliteVal(["vitreous_lactate", "lactic_acid"]),
+    getMetaboliteVal(["choline", "vitreous_choline"]),
+    getMetaboliteVal(["taurine", "vitreous_taurine"]),
+    getMetaboliteVal(["glycerol", "vitreous_glycerol"]),
+    getMetaboliteVal(["succinic_acid", "succinate"]),
+    getMetaboliteVal(["formic_acid", "formate"]),
+    getMetaboliteVal(["uric_acid", "urate"]),
+    getMetaboliteVal(["creatine"]),
+    getMetaboliteVal(["putrescine"]),
+    getMetaboliteVal(["cadaverine"])
+  ].filter((v) => v !== null && v !== undefined).length;
+
+  const missingMetabCount = metab.enabled ? Math.max(0, 11 - activeMetabCount) : 11;
+  setContinuousFeature("metabolomics_missing_feature_count", missingMetabCount, 4);
 
   const cvImages = (vision.images || []).filter((img) => !img.isUnrelated);
   const cvAvailable = cvImages.length > 0 && !vision.unrelatedImagesDetected;

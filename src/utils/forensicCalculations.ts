@@ -511,41 +511,38 @@ export function evaluateMetabolomics(metab: MetabolomicsData): {
     primaryKPmi = (pmiMadea + pmiSturner) / 2;
   }
 
-  // Check additional metabolites & direct Vitreous Sodium decline
-  const additionalPmis: Array<{ pmi: number; weight: number }> = [{ pmi: primaryKPmi, weight: 1.0 }];
-
-  // Direct Vitreous Sodium post-mortem decline regression (Coe / Madea model: ~0.5 mmol/L per hour from 142 baseline)
-  let naPmiEstimate: number | undefined = undefined;
-  const hasNaInSelected = metab.selectedMetabolites?.some((m) => m.metaboliteKey === "vitreous_sodium");
-  if (!hasNaInSelected && na !== undefined && na <= 142 && na >= 100) {
-    naPmiEstimate = Math.max(1, Math.min(72, Number(((142 - na) / 0.5).toFixed(1))));
-    additionalPmis.push({ pmi: naPmiEstimate, weight: 0.65 });
-  }
+  // Compute composite PMI from active validated metabolites (the 11-marker panel)
+  const additionalPmis: Array<{ pmi: number; weight: number }> = [];
 
   if (metab.selectedMetabolites && metab.selectedMetabolites.length > 0) {
     for (const item of metab.selectedMetabolites) {
-      if (item.metaboliteKey !== "vitreous_potassium" && item.pmiContributionHours > 0) {
-        additionalPmis.push({ pmi: item.pmiContributionHours, weight: item.confidence / 100 });
+      if (item.pmiContributionHours > 0) {
+        additionalPmis.push({ pmi: item.pmiContributionHours, weight: (item.confidence || 85) / 100 });
       }
     }
+  }
+
+  // If no items loaded in selectedMetabolites yet, fall back gracefully
+  if (additionalPmis.length === 0) {
+    const fallbackK = metab.vitreousPotassiumMmolL ?? 6.5;
+    const fallbackPmi = fallbackK <= 4.0 ? 1.0 : (pmiMadea + pmiSturner) / 2;
+    additionalPmis.push({ pmi: fallbackPmi, weight: 1.0 });
   }
 
   const totalWeight = additionalPmis.reduce((acc, curr) => acc + curr.weight, 0);
   const weightedPmi = additionalPmis.reduce((acc, curr) => acc + curr.pmi * curr.weight, 0) / (totalWeight || 1);
 
-  const standardErrorHours = Math.max(3.0, weightedPmi * 0.20);
+  const standardErrorHours = Math.max(2.5, weightedPmi * 0.18);
   const minH = Math.max(0, Number((weightedPmi - standardErrorHours).toFixed(1)));
   const maxH = Number((weightedPmi + standardErrorHours).toFixed(1));
 
   let confidence = 85;
-  if (metab.vitreousPotassiumMmolL > 16.0) confidence = 55;
-  if (metab.selectedMetabolites && metab.selectedMetabolites.length > 1) {
-    confidence = Math.min(95, confidence + 5);
+  if (metab.selectedMetabolites && metab.selectedMetabolites.length >= 3) {
+    confidence = Math.min(95, 80 + metab.selectedMetabolites.length * 1.5);
   }
 
-  let status: "optimal_window" | "moderate_utility" | "outside_reliable_window" | "conflict_flagged" =
-    metab.vitreousPotassiumMmolL <= 15 ? "optimal_window" : "moderate_utility";
-  let notes = `Metabolomics multi-analyte consensus across ${additionalPmis.length} marker(s) yielding est. ${weightedPmi.toFixed(1)}h window.`;
+  let status: "optimal_window" | "moderate_utility" | "outside_reliable_window" | "conflict_flagged" = "optimal_window";
+  let notes = `Multi-analyte metabolomics consensus across ${additionalPmis.length} validated marker(s) yielding est. ${weightedPmi.toFixed(1)}h window.`;
 
   if (uremicCorrectionApplied && vun !== undefined) {
     notes += ` [VUN Uremic Correction]: VUN=${vun} mg/dL indicates antemortem azotemia; baseline [K⁺] corrected to prevent false overestimation.`;
@@ -575,7 +572,7 @@ export function evaluateMetabolomics(metab: MetabolomicsData): {
     rawPotassiumMmolL: metab.vitreousPotassiumMmolL,
     kExcessSubtracted: kExcess,
     dehydrationRatio: hypernatremicRatio,
-    naPmiEstimate,
+    naPmiEstimate: undefined,
     pmiMadea: Number(pmiMadea.toFixed(1)),
     pmiSturner: Number(pmiSturner.toFixed(1)),
   };
@@ -692,60 +689,7 @@ export function detectInconsistencies(
     }
   }
 
-  // 5. Suspected antemortem renal failure or ocular trauma alert
-  if (metabolomics.enabled && metabolomics.suspectedRenalFailureOrTrauma) {
-    alerts.push({
-      id: "alert-metabolomics-renal-trauma",
-      severity: "warning",
-      title: "Vitreous Potassium Affected by Antemortem Renal Failure or Trauma",
-      description: "Antemortem renal failure or ocular trauma is suspected. Potassium levels may be elevated due to systemic uremia or local hemorrhage rather than normal post-mortem retinal autolysis.",
-      indicatorA: "Metabolomics ([K+])",
-      indicatorB: "Clinical Pathological History",
-      forensicImplication: "Vitreous potassium should be interpreted with caution and down-weighted in the final composite PMI calculation.",
-    });
-  }
 
-  // 5b. Vitreous Urea Nitrogen (VUN) elevation alert
-  const vunItem = metabolomics.selectedMetabolites?.find((m) => m.metaboliteKey === "urea_nitrogen");
-  const vun = vunItem ? vunItem.measuredValue : metabolomics.ureaNitrogenMgDl;
-  if (metabolomics.enabled && vun !== undefined && vun > 40) {
-    alerts.push({
-      id: "alert-metabolomics-vun-elevation",
-      severity: "warning",
-      title: "Elevated Vitreous Urea Nitrogen (VUN) — Antemortem Azotemia / Uremia",
-      description: `Vitreous Urea Nitrogen is elevated at ${vun} mg/dL (normal: 10–25 mg/dL), indicating antemortem renal failure or acute uremic state.`,
-      indicatorA: "Vitreous Urea Nitrogen (VUN)",
-      indicatorB: "Vitreous Potassium ([K⁺])",
-      forensicImplication: "Antemortem hyperkalemia is present. Uncorrected [K⁺] formulas will grossly overestimate PMI (by 10–25+ hours). Baseline potassium offset correction applied.",
-    });
-  }
-
-  // 5c. Vitreous Sodium ([Na⁺]) electrolyte derangement alert
-  const naItem = metabolomics.selectedMetabolites?.find((m) => m.metaboliteKey === "vitreous_sodium");
-  const na = naItem ? naItem.measuredValue : metabolomics.vitreousSodiumMmolL;
-  if (metabolomics.enabled && na !== undefined) {
-    if (na > 152) {
-      alerts.push({
-        id: "alert-metabolomics-hypernatremia",
-        severity: "warning",
-        title: "Vitreous Hypernatremia — Severe Dehydration / Hemoconcentration",
-        description: `Vitreous sodium is elevated at ${na} mmol/L (normal: 135–150 mmol/L), indicating profound antemortem hypertonic dehydration.`,
-        indicatorA: "Vitreous Sodium ([Na⁺])",
-        indicatorB: "Vitreous Potassium ([K⁺])",
-        forensicImplication: "Osmotic fluid contraction concentrates all vitreous electrolytes. Unadjusted [K⁺] overestimates time of death; normalization applied.",
-      });
-    } else if (na < 125) {
-      alerts.push({
-        id: "alert-metabolomics-hyponatremia",
-        severity: "warning",
-        title: "Vitreous Hyponatremia — Hemodilution / Water Intoxication",
-        description: `Vitreous sodium is markedly depleted at ${na} mmol/L (normal: 135–150 mmol/L).`,
-        indicatorA: "Vitreous Sodium ([Na⁺])",
-        indicatorB: "Scene Environment / Immersion",
-        forensicImplication: "May indicate antemortem hypotonic dilution, freshwater immersion, or SIADH, which dilutes vitreous [K⁺].",
-      });
-    }
-  }
 
   // 6. Cold stiffening / freezing advisory
   if (rigor.enabled && rigor.coldStiffeningSuspected) {

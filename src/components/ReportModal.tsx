@@ -144,11 +144,9 @@ FORENSIC INDICATOR MODULE EVALUATION:
    • Maggot Mass Temp:    ${caseData.entomology.enabled ? `${caseData.entomology.maggotMassTempC} °C` : "N/A"}
    • Indoor Access Delay: ${caseData.entomology.enabled ? `${caseData.entomology.indoorAccessDelayHours} hours` : "N/A"}
 
-6. VITREOUS METABOLOMICS & BIOCHEMISTRY:
+6. METABOLOMICS MULTI-ANALYTE PANEL:
    • Status:              ${caseData.metabolomics.enabled ? "ACTIVE" : "BYPASSED / OFF"}
-   • Vitreous [K+]:       ${caseData.metabolomics.enabled ? `${caseData.metabolomics.vitreousPotassiumMmolL} mmol/L` : "N/A"}
-   • Vitreous Hypoxanthine:${caseData.metabolomics.enabled && caseData.metabolomics.vitreousHypoxanthineUmolL ? `${caseData.metabolomics.vitreousHypoxanthineUmolL} µmol/L` : "N/A"}
-   • Renal Disease/Trauma:${caseData.metabolomics.enabled ? (caseData.metabolomics.suspectedRenalFailureOrTrauma ? "SUSPECTED (K+ ELEVATION CAVEAT)" : "None") : "N/A"}
+   • Active Analytes:     ${caseData.metabolomics.enabled ? (caseData.metabolomics.selectedMetabolites?.length ? `${caseData.metabolomics.selectedMetabolites.length} of 11 markers (${caseData.metabolomics.selectedMetabolites.map(m => `${m.name}: ${m.measuredValue} ${m.unit}`).join("; ")})` : "None loaded") : "N/A"}
 
 --------------------------------------------------------------------------------
 PHOTOGRAPHIC EVIDENCE & VISION ANALYSIS:
@@ -671,11 +669,11 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                   {/* Metabolomics */}
                   <tr>
                     <td className="p-3 font-semibold text-slate-200 flex items-center gap-1.5">
-                      <TestTube2 className="w-3.5 h-3.5 text-sky-400 shrink-0" /> Vitreous [K+]
+                      <TestTube2 className="w-3.5 h-3.5 text-sky-400 shrink-0" /> Metabolomics
                     </td>
                     <td className="p-3 text-slate-300">
                       {caseData.metabolomics.enabled
-                        ? `[K+] ${caseData.metabolomics.vitreousPotassiumMmolL} mmol/L (Madea/Sturner)`
+                        ? `${caseData.metabolomics.selectedMetabolites?.length || 0} of 11 Analytes Loaded`
                         : "Bypassed / Disabled"}
                     </td>
                     <td className="p-3 font-mono text-teal-300 whitespace-nowrap">
