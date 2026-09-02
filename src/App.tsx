@@ -500,7 +500,7 @@ export default function App() {
       label: "8. Metabolomics",
       icon: TestTube2,
       status: caseData.metabolomics.enabled ? "active" : "bypassed",
-      badge: caseData.metabolomics.enabled ? `${caseData.metabolomics.vitreousPotassiumMmolL} mmol/L` : "Off",
+      badge: caseData.metabolomics.enabled ? `${caseData.metabolomics.selectedMetabolites?.length || 0} analytes` : "Off",
     },
     {
       id: "report",
@@ -750,13 +750,13 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
                     <FileSpreadsheet className="w-3 h-3 text-teal-400" />
-                    <span>Preset Case:</span>
+                    <span>Case Baseline:</span>
                   </label>
-                  {presetAudit.isPreset && presetAudit.isModified && (
+                  {(presetAudit.isPreset || presetAudit.isSceneBaseline) && presetAudit.isModified && (
                     <button
                       type="button"
                       onClick={() => {
-                        const orig = FORENSIC_PRESETS.find(
+                        const orig = presetAudit.baseline || FORENSIC_PRESETS.find(
                           (p) => (caseData.presetId && p.presetId === caseData.presetId) || p.caseId === caseData.caseId
                         );
                         if (orig) {
@@ -765,7 +765,7 @@ export default function App() {
                         }
                       }}
                       className="text-[9px] text-amber-300 hover:text-white underline cursor-pointer"
-                      title="Revert modifications to original preset baseline"
+                      title="Revert modifications to original baseline"
                     >
                       Revert Baseline
                     </button>
@@ -796,8 +796,8 @@ export default function App() {
                         ))}
                       </select>
 
-                      {/* Preset Modification Status Badge in Sidebar */}
-                      {presetAudit.isPreset && (
+                      {/* Baseline Modification Status Badge in Sidebar */}
+                      {(presetAudit.isPreset || presetAudit.isSceneBaseline) && (
                         <div className="mt-1">
                           {presetAudit.isModified ? (
                             <div className="p-2 rounded-lg bg-amber-950/60 border border-amber-800/80 text-[10px] space-y-1">
@@ -809,7 +809,7 @@ export default function App() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const orig = FORENSIC_PRESETS.find(
+                                    const orig = presetAudit.baseline || FORENSIC_PRESETS.find(
                                       (p) => (caseData.presetId && p.presetId === caseData.presetId) || p.caseId === caseData.caseId
                                     );
                                     if (orig) {
@@ -818,7 +818,7 @@ export default function App() {
                                     }
                                   }}
                                   className="text-[9px] text-amber-200 hover:text-white underline cursor-pointer"
-                                  title="Revert to baseline preset"
+                                  title="Revert to baseline"
                                 >
                                   Revert
                                 </button>
@@ -1052,7 +1052,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        const orig = FORENSIC_PRESETS.find(
+                        const orig = presetAudit.baseline || FORENSIC_PRESETS.find(
                           (p) => (caseData.presetId && p.presetId === caseData.presetId) || p.caseId === caseData.caseId
                         );
                         if (orig) {
@@ -1061,7 +1061,7 @@ export default function App() {
                         }
                       }}
                       className="text-[10px] text-amber-200 hover:text-white underline cursor-pointer font-medium ml-auto sm:ml-2 shrink-0"
-                      title="Revert all changes back to original preset baseline"
+                      title="Revert all changes back to original baseline"
                     >
                       Revert Baseline
                     </button>
@@ -1111,7 +1111,7 @@ export default function App() {
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                   <div className="flex items-center gap-1.5 text-slate-400 text-xs font-medium shrink-0">
                     <FileSpreadsheet className="w-3.5 h-3.5 text-teal-400" />
-                    <span className="text-[11px] font-semibold text-slate-300">Case Preset:</span>
+                    <span className="text-[11px] font-semibold text-slate-300">Case Baseline:</span>
                   </div>
                   <div className="relative min-w-0 flex-1 w-full sm:w-auto">
                     {(() => {
@@ -1142,8 +1142,8 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Preset Modification Status Row in Section 1 */}
-                {presetAudit.isPreset && (
+                {/* Baseline Modification Status Row in Section 1 */}
+                {(presetAudit.isPreset || presetAudit.isSceneBaseline) && (
                   <div className="space-y-1.5 text-xs">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       {presetAudit.isModified ? (
@@ -1155,7 +1155,7 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => {
-                              const orig = FORENSIC_PRESETS.find(
+                              const orig = presetAudit.baseline || FORENSIC_PRESETS.find(
                                 (p) => (caseData.presetId && p.presetId === caseData.presetId) || p.caseId === caseData.caseId
                               );
                               if (orig) {
@@ -1164,7 +1164,7 @@ export default function App() {
                               }
                             }}
                             className="ml-auto text-[10px] text-amber-200 hover:text-white underline cursor-pointer font-medium pl-1"
-                            title="Revert all changes back to original preset baseline"
+                            title="Revert all changes back to original baseline"
                           >
                             Revert
                           </button>
@@ -1172,7 +1172,7 @@ export default function App() {
                       ) : (
                         <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-[11px] font-medium">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                          <span>Original Benchmark Baseline (Unaltered)</span>
+                          <span>Original Baseline Record (Unaltered)</span>
                         </div>
                       )}
                     </div>

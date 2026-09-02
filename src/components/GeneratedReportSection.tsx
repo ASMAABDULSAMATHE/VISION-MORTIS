@@ -118,9 +118,9 @@ export const GeneratedReportSection: React.FC<Props> = ({
 ================================================================================
 CASE RECORD & DEMOGRAPHICS:
 • Case / File Number:     ${caseData.caseId || "Not Assigned"}
-${presetAudit.isPreset ? `• Preset Reference Case:  ${presetAudit.presetName || caseData.presetName} [${presetAudit.presetCategory || "Benchmark Case"}]
-• Preset Modification:    ${presetAudit.isModified ? `MODIFIED BY EXAMINER (${presetAudit.modifiedCount} parameter(s) adjusted)` : "UNALTERED BENCHMARK BASELINE"}
-${presetAudit.isModified && presetAudit.modifiedFieldLabels.length > 0 ? `• Altered Parameters:     ${presetAudit.modifiedFieldLabels.join("; ")}\n` : ""}• Preset Description:     ${caseData.presetDescription || "Standard forensic benchmark profile"}\n` : ""}• Subject Identification: ${caseData.subjectNameOrIdentifier || "Unidentified Doe"}
+${(presetAudit.isPreset || presetAudit.isSceneBaseline) ? `• ${presetAudit.isSceneBaseline ? "Scene Intake Baseline" : "Preset Reference Case"}:  ${presetAudit.presetName || caseData.presetName || "Initial Scene Record"} [${presetAudit.presetCategory || "Benchmark Case"}]
+• Parameter Integrity:    ${presetAudit.isModified ? `MODIFIED BY EXAMINER (${presetAudit.modifiedCount} parameter(s) adjusted)` : "UNALTERED BENCHMARK BASELINE"}
+${presetAudit.isModified && presetAudit.modifiedFieldLabels.length > 0 ? `• Altered Parameters:     ${presetAudit.modifiedFieldLabels.join("; ")}\n` : ""}• Description:            ${caseData.presetDescription || "Standard forensic intake profile"}\n` : ""}• Subject Identification: ${caseData.subjectNameOrIdentifier || "Unidentified Doe"}
 • Estimated Age / Sex:    ${caseData.ageYears ? `${caseData.ageYears} years` : "Unspecified"} / ${(caseData.sex || "Unknown").toUpperCase()}
 • Attending Examiner:     ${caseData.investigatorName || caseData.examinerName || "Staff Medical Examiner"}
 • Jurisdiction / Agency:  ${caseData.jurisdiction || "Forensic Pathology Division"}
@@ -630,8 +630,8 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
           </div>
         </div>
 
-        {/* Preset Benchmark Case Banner (if preset used) */}
-        {(caseData.presetName || caseData.isPresetCase || presetAudit.isPreset) && (
+        {/* Preset Benchmark Case Banner (if preset or scene baseline used) */}
+        {(caseData.presetName || caseData.isPresetCase || presetAudit.isPreset || presetAudit.isSceneBaseline) && (
           <div className={`p-4 rounded-xl border flex items-start gap-3.5 text-xs animate-in fade-in duration-150 ${
             presetAudit.isModified
               ? "bg-amber-950/30 border-amber-500/50 shadow-md shadow-amber-950/20"
@@ -649,10 +649,10 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                 <span className={`text-[11px] font-bold uppercase tracking-wider ${
                   presetAudit.isModified ? "text-amber-300" : "text-teal-300"
                 }`}>
-                  Preset Reference Profile:
+                  {presetAudit.isSceneBaseline ? "Scene Intake Profile:" : "Preset Reference Profile:"}
                 </span>
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-900 text-slate-200 border border-slate-700">
-                  {presetAudit.presetCategory || caseData.presetCategory || "Benchmark Case"}
+                  {presetAudit.presetCategory || caseData.presetCategory || (presetAudit.isSceneBaseline ? "Scene Baseline" : "Benchmark Case")}
                 </span>
 
                 {presetAudit.isModified ? (
@@ -712,7 +712,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
             <span>1. Case Demographics & Scene Baseline</span>
           </div>
 
-          <div className={`grid grid-cols-1 sm:grid-cols-2 ${presetAudit.isPreset ? 'lg:grid-cols-6' : 'lg:grid-cols-5'} gap-3`}>
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${(presetAudit.isPreset || presetAudit.isSceneBaseline) ? 'lg:grid-cols-6' : 'lg:grid-cols-5'} gap-3`}>
             <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800">
               <div className="text-[11px] text-slate-500">Case / File Number</div>
               <div className="font-mono font-bold text-sm text-slate-100 mt-0.5 truncate">
@@ -720,15 +720,15 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
               </div>
             </div>
 
-            {presetAudit.isPreset && (
+            {(presetAudit.isPreset || presetAudit.isSceneBaseline) && (
               <div className={`p-3.5 rounded-xl border ${
                 presetAudit.isModified
                   ? "bg-amber-950/20 border-amber-800/60"
                   : "bg-slate-900/90 border-slate-800"
               }`}>
-                <div className="text-[11px] text-slate-500">Preset Case Status</div>
+                <div className="text-[11px] text-slate-500">{presetAudit.isSceneBaseline ? "Scene Baseline Status" : "Preset Case Status"}</div>
                 <div className="font-bold text-xs mt-0.5 truncate text-slate-200" title={presetAudit.presetName}>
-                  {presetAudit.presetName || "Benchmark Case"}
+                  {presetAudit.presetName || (presetAudit.isSceneBaseline ? "Initial Scene Intake" : "Benchmark Case")}
                 </div>
                 <div className={`text-[10px] font-semibold mt-1 truncate ${
                   presetAudit.isModified ? "text-amber-400 font-medium" : "text-emerald-400"

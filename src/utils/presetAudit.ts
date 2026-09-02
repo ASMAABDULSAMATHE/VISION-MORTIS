@@ -3,6 +3,7 @@ import { FORENSIC_PRESETS } from "../data/forensicPresets";
 
 export interface PresetAuditResult {
   isPreset: boolean;
+  isSceneBaseline?: boolean;
   presetId?: string;
   presetName?: string;
   presetCategory?: string;
@@ -16,13 +17,14 @@ export interface PresetAuditResult {
 }
 
 /**
- * Audits a ForensicCaseInput against benchmark preset definitions to detect
- * whether the examiner has made any modifications to the loaded preset.
+ * Audits a ForensicCaseInput against benchmark preset definitions or initial scene intake baseline
+ * to detect whether the examiner has made any modifications to the recorded findings.
  */
 export function auditPresetModifications(caseData: ForensicCaseInput): PresetAuditResult {
   if (!caseData) {
     return {
       isPreset: false,
+      isSceneBaseline: false,
       isModified: false,
       modifiedCount: 0,
       modifiedFieldLabels: [],
@@ -38,9 +40,12 @@ export function auditPresetModifications(caseData: ForensicCaseInput): PresetAud
     (p) => (caseData.presetId && p.presetId === caseData.presetId) || (caseData.caseId && p.caseId === caseData.caseId) || (caseData.presetName && p.presetName === caseData.presetName)
   );
 
-  if (!isMarkedPreset && !matchedBaseline) {
+  const baseline = matchedBaseline || caseData.sceneBaseline;
+
+  if (!isMarkedPreset && !matchedBaseline && !caseData.sceneBaseline) {
     return {
       isPreset: false,
+      isSceneBaseline: false,
       isModified: false,
       modifiedCount: 0,
       modifiedFieldLabels: [],
@@ -50,18 +55,20 @@ export function auditPresetModifications(caseData: ForensicCaseInput): PresetAud
     };
   }
 
-  const baseline = matchedBaseline;
+  const isPresetCase = isMarkedPreset || !!matchedBaseline;
+
   if (!baseline) {
     return {
-      isPreset: true,
+      isPreset: isPresetCase,
+      isSceneBaseline: !isPresetCase && !!caseData.sceneBaseline,
       presetId: caseData.presetId,
-      presetName: caseData.presetName || "Benchmark Preset",
-      presetCategory: caseData.presetCategory || "Preset Case",
+      presetName: caseData.presetName || (isPresetCase ? "Benchmark Preset" : "Scene Intake Baseline"),
+      presetCategory: caseData.presetCategory || (isPresetCase ? "Preset Case" : "Scene Baseline"),
       isModified: true,
       modifiedCount: 1,
       modifiedFieldLabels: ["Custom Modifications Applied"],
-      auditSummaryText: "Preset Benchmark with examiner adjustments.",
-      shortStatusBadge: "Preset (Modified by Examiner)",
+      auditSummaryText: isPresetCase ? "Preset Benchmark with examiner adjustments." : "Scene intake with examiner adjustments.",
+      shortStatusBadge: isPresetCase ? "Preset (Modified by Examiner)" : "Scene Baseline (Modified)",
       statusColor: "amber",
     };
   }
@@ -210,38 +217,10 @@ export function auditPresetModifications(caseData: ForensicCaseInput): PresetAud
     }
   }
 
-  // Metabolomics & Vitreous Chemistry
+  // Metabolomics (11-Marker Panel)
   if (caseData.metabolomics.enabled !== baseline.metabolomics.enabled) {
     diffs.push(`Metabolomics (${baseline.metabolomics.enabled ? "Active" : "Bypassed"} → ${caseData.metabolomics.enabled ? "Active" : "Bypassed"})`);
   } else if (caseData.metabolomics.enabled) {
-    if (caseData.metabolomics.vitreousPotassiumMmolL !== baseline.metabolomics.vitreousPotassiumMmolL) {
-      diffs.push(`Vitreous [K+] (${baseline.metabolomics.vitreousPotassiumMmolL} → ${caseData.metabolomics.vitreousPotassiumMmolL} mmol/L)`);
-    }
-
-    const baseVun = baseline.metabolomics.ureaNitrogenMgDl ?? 18;
-    const currVun = caseData.metabolomics.ureaNitrogenMgDl ?? 18;
-    if (currVun !== baseVun) {
-      diffs.push(`VUN (${baseVun} → ${currVun} mg/dL)`);
-    }
-
-    const baseNa = baseline.metabolomics.vitreousSodiumMmolL ?? 140;
-    const currNa = caseData.metabolomics.vitreousSodiumMmolL ?? 140;
-    if (currNa !== baseNa) {
-      diffs.push(`Vitreous [Na+] (${baseNa} → ${currNa} mmol/L)`);
-    }
-
-    if (caseData.metabolomics.vitreousHypoxanthineUmolL !== undefined && baseline.metabolomics.vitreousHypoxanthineUmolL !== undefined && caseData.metabolomics.vitreousHypoxanthineUmolL !== baseline.metabolomics.vitreousHypoxanthineUmolL) {
-      diffs.push(`Hypoxanthine (${baseline.metabolomics.vitreousHypoxanthineUmolL} → ${caseData.metabolomics.vitreousHypoxanthineUmolL} µmol/L)`);
-    }
-
-    if (caseData.metabolomics.vitreousLactateMmolL !== undefined && baseline.metabolomics.vitreousLactateMmolL !== undefined && caseData.metabolomics.vitreousLactateMmolL !== baseline.metabolomics.vitreousLactateMmolL) {
-      diffs.push(`Lactate (${baseline.metabolomics.vitreousLactateMmolL} → ${caseData.metabolomics.vitreousLactateMmolL} mmol/L)`);
-    }
-
-    if (caseData.metabolomics.suspectedRenalFailureOrTrauma !== baseline.metabolomics.suspectedRenalFailureOrTrauma) {
-      diffs.push(`Renal Guard (${baseline.metabolomics.suspectedRenalFailureOrTrauma ? "Active" : "Off"} → ${caseData.metabolomics.suspectedRenalFailureOrTrauma ? "Active" : "Off"})`);
-    }
-
     // Check individual selected metabolites
     const baseMetabs = baseline.metabolomics.selectedMetabolites || [];
     const currMetabs = caseData.metabolomics.selectedMetabolites || [];
@@ -268,27 +247,35 @@ export function auditPresetModifications(caseData: ForensicCaseInput): PresetAud
   const isModified = diffs.length > 0;
 
   return {
-    isPreset: true,
+    isPreset: isPresetCase,
+    isSceneBaseline: !isPresetCase && !!caseData.sceneBaseline,
     presetId: baseline.presetId || caseData.presetId,
-    presetName: baseline.presetName || caseData.presetName,
-    presetCategory: baseline.presetCategory || caseData.presetCategory,
+    presetName: isPresetCase ? (baseline.presetName || caseData.presetName) : "Initial Scene Intake",
+    presetCategory: isPresetCase ? (baseline.presetCategory || caseData.presetCategory) : "Scene Observation Baseline",
     baseline,
     isModified,
     modifiedCount: diffs.length,
     modifiedFieldLabels: diffs,
     auditSummaryText: isModified
-      ? `Modified by Examiner: ${diffs.length} parameter(s) adjusted from benchmark baseline (${diffs.join("; ")}).`
-      : "Unaltered Benchmark Baseline: All forensic parameters match the original standardized case preset.",
-    shortStatusBadge: isModified ? `Preset (Modified by Examiner - ${diffs.length} Δ)` : "Preset (Original Baseline)",
+      ? (isPresetCase
+          ? `Modified by Examiner: ${diffs.length} parameter(s) adjusted from benchmark baseline (${diffs.join("; ")}).`
+          : `Modified from Scene Intake: ${diffs.length} parameter(s) adjusted since initial scene intake (${diffs.join("; ")}).`)
+      : (isPresetCase
+          ? "Unaltered Benchmark Baseline: All forensic parameters match the original standardized case preset."
+          : "Unaltered Scene Baseline: All parameters match the initial scene observation record."),
+    shortStatusBadge: isModified
+      ? (isPresetCase ? `Preset (Modified - ${diffs.length} Δ)` : `Modified from Scene (${diffs.length} Δ)`)
+      : (isPresetCase ? "Preset (Original Baseline)" : "Initial Scene Baseline"),
     statusColor: isModified ? "amber" : "emerald",
   };
 }
 
 export function getBaselineCase(caseData: ForensicCaseInput): ForensicCaseInput | null {
   if (!caseData) return null;
-  return FORENSIC_PRESETS.find(
+  const matched = FORENSIC_PRESETS.find(
     (p) => (caseData.presetId && p.presetId === caseData.presetId) ||
            (caseData.caseId && p.caseId === caseData.caseId) ||
            (caseData.presetName && p.presetName === caseData.presetName)
-  ) || null;
+  );
+  return matched || caseData.sceneBaseline || null;
 }

@@ -78,12 +78,7 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
       indoorAccessDelayHours: 0,
     },
     metabolomics: {
-      enabled: true,
-      vitreousPotassiumMmolL: 5.1,
-      vitreousSodiumMmolL: 140,
-      ureaNitrogenMgDl: 18,
-      vitreousHypoxanthineUmolL: 28,
-      suspectedRenalFailureOrTrauma: false,
+      enabled: false,
     },
   },
   {
@@ -163,12 +158,7 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
       indoorAccessDelayHours: 6,
     },
     metabolomics: {
-      enabled: true,
-      vitreousPotassiumMmolL: 9.4,
-      vitreousSodiumMmolL: 132,
-      ureaNitrogenMgDl: 22,
-      vitreousHypoxanthineUmolL: 46,
-      suspectedRenalFailureOrTrauma: false,
+      enabled: false,
     },
   },
   {
@@ -250,10 +240,6 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
     },
     metabolomics: {
       enabled: false,
-      vitreousPotassiumMmolL: 14.2,
-      vitreousSodiumMmolL: 158,
-      ureaNitrogenMgDl: 48,
-      suspectedRenalFailureOrTrauma: false,
     },
   },
   {
@@ -333,11 +319,7 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
       indoorAccessDelayHours: 4,
     },
     metabolomics: {
-      enabled: true,
-      vitreousPotassiumMmolL: 7.8,
-      vitreousSodiumMmolL: 142,
-      ureaNitrogenMgDl: 24,
-      suspectedRenalFailureOrTrauma: false,
+      enabled: false,
     },
   },
   {
@@ -417,11 +399,7 @@ export const FORENSIC_CASE_PRESETS: ForensicPresetCase[] = [
       indoorAccessDelayHours: 0,
     },
     metabolomics: {
-      enabled: true,
-      vitreousPotassiumMmolL: 5.6,
-      vitreousSodiumMmolL: 139,
-      ureaNitrogenMgDl: 16,
-      suspectedRenalFailureOrTrauma: false,
+      enabled: false,
     },
   },
 ];
@@ -446,6 +424,10 @@ export const FORENSIC_PRESETS: ForensicCaseInput[] = FORENSIC_CASE_PRESETS.map((
   const entoTime = timeOffset(20);
   const metabTime = timeOffset(25);
   const visionTime = timeOffset(2);
+
+  const hasMetabolites = Boolean(
+    p.metabolomics?.selectedMetabolites && p.metabolomics.selectedMetabolites.length > 0
+  );
 
   return {
     caseId: p.metadata.caseNumber,
@@ -476,6 +458,7 @@ export const FORENSIC_PRESETS: ForensicCaseInput[] = FORENSIC_CASE_PRESETS.map((
       vitreousSodiumMmolL: 140,
       ureaNitrogenMgDl: 18,
       ...p.metabolomics,
+      enabled: hasMetabolites ? Boolean(p.metabolomics?.enabled) : false,
       recordedAt: metabTime,
     },
     examinersNotes: p.metadata.examinersNotes,

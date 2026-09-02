@@ -12,6 +12,7 @@ import {
   PmiCalculationResult,
   RigorMortisData,
 } from "../types";
+import { getBaselineCase } from "./presetAudit";
 
 /**
  * Solves the Henssge Nomogram double exponential cooling equation:
@@ -476,13 +477,11 @@ export function evaluateMetabolomics(metab: MetabolomicsData): {
   const naItem = metab.selectedMetabolites?.find((m) => m.metaboliteKey === "vitreous_sodium");
   const na = naItem ? naItem.measuredValue : metab.vitreousSodiumMmolL;
 
-  let k = metab.vitreousPotassiumMmolL;
+  let k = metab.vitreousPotassiumMmolL ?? 4.0;
   let uremicCorrectionApplied = false;
   let dehydrationConcentrationApplied = false;
 
   // 1. Antemortem Uremia / Renal Failure Correction via VUN
-  // Antemortem baseline potassium is normally 3.8-4.0 mmol/L. In renal failure / azotemia (VUN > 30 mg/dL),
-  // baseline K+ is elevated (antemortem hyperkalemia).
   let kExcess = 0;
   if (vun !== undefined && vun > 30) {
     kExcess = Math.min(3.8, Number(((vun - 25) * 0.035).toFixed(2)));
@@ -491,7 +490,6 @@ export function evaluateMetabolomics(metab: MetabolomicsData): {
   }
 
   // 2. Severe Hypernatremic Dehydration Correction via Na+
-  // If [Na+] > 152 mmol/L, dehydration hemoconcentrates vitreous solutes
   let hypernatremicRatio = 1.0;
   if (na !== undefined && na > 152) {
     hypernatremicRatio = Number((na / 142).toFixed(2));
@@ -500,15 +498,12 @@ export function evaluateMetabolomics(metab: MetabolomicsData): {
   }
 
   const pmiMadea = Math.max(0.5, 5.26 * (k - 4.0));
-  const pmiSturner = 7.14 * k - 39.1;
-  // Sturner equation has an x-intercept at 5.47 mmol/L; for lower values, use Madea's established early slope
-  let primaryKPmi: number;
+  const pmiSturner = Math.max(0.5, 7.14 * k - 39.1);
+  let primaryKPmi = (pmiMadea + pmiSturner) / 2;
   if (k <= 4.0) {
     primaryKPmi = 1.0;
   } else if (pmiSturner <= 0) {
     primaryKPmi = pmiMadea;
-  } else {
-    primaryKPmi = (pmiMadea + pmiSturner) / 2;
   }
 
   // Compute composite PMI from active validated metabolites (the 11-marker panel)
@@ -524,17 +519,18 @@ export function evaluateMetabolomics(metab: MetabolomicsData): {
 
   // If no items loaded in selectedMetabolites yet, fall back gracefully
   if (additionalPmis.length === 0) {
-    const fallbackK = metab.vitreousPotassiumMmolL ?? 6.5;
+    const fallbackK = k;
     const fallbackPmi = fallbackK <= 4.0 ? 1.0 : (pmiMadea + pmiSturner) / 2;
-    additionalPmis.push({ pmi: fallbackPmi, weight: 1.0 });
+    additionalPmis.push({ pmi: isNaN(fallbackPmi) ? 1.0 : fallbackPmi, weight: 1.0 });
   }
 
   const totalWeight = additionalPmis.reduce((acc, curr) => acc + curr.weight, 0);
   const weightedPmi = additionalPmis.reduce((acc, curr) => acc + curr.pmi * curr.weight, 0) / (totalWeight || 1);
+  const safeWeightedPmi = isNaN(weightedPmi) ? 1.0 : weightedPmi;
 
-  const standardErrorHours = Math.max(2.5, weightedPmi * 0.18);
-  const minH = Math.max(0, Number((weightedPmi - standardErrorHours).toFixed(1)));
-  const maxH = Number((weightedPmi + standardErrorHours).toFixed(1));
+  const standardErrorHours = Math.max(2.5, safeWeightedPmi * 0.18);
+  const minH = Math.max(0, Number((safeWeightedPmi - standardErrorHours).toFixed(1)));
+  const maxH = Number((safeWeightedPmi + standardErrorHours).toFixed(1));
 
   let confidence = 85;
   if (metab.selectedMetabolites && metab.selectedMetabolites.length >= 3) {
@@ -542,7 +538,7 @@ export function evaluateMetabolomics(metab: MetabolomicsData): {
   }
 
   let status: "optimal_window" | "moderate_utility" | "outside_reliable_window" | "conflict_flagged" = "optimal_window";
-  let notes = `Multi-analyte metabolomics consensus across ${additionalPmis.length} validated marker(s) yielding est. ${weightedPmi.toFixed(1)}h window.`;
+  let notes = `Multi-analyte metabolomics consensus across ${additionalPmis.length} validated marker(s) yielding est. ${safeWeightedPmi.toFixed(1)}h window.`;
 
   if (uremicCorrectionApplied && vun !== undefined) {
     notes += ` [VUN Uremic Correction]: VUN=${vun} mg/dL indicates antemortem azotemia; baseline [K⁺] corrected to prevent false overestimation.`;
@@ -562,19 +558,19 @@ export function evaluateMetabolomics(metab: MetabolomicsData): {
   }
 
   return {
-    minHours: minH,
-    maxHours: maxH,
-    optimalHours: Number(weightedPmi.toFixed(1)),
+    minHours: isNaN(minH) ? 0 : minH,
+    maxHours: isNaN(maxH) ? 0 : maxH,
+    optimalHours: isNaN(safeWeightedPmi) ? 1.0 : Number(safeWeightedPmi.toFixed(1)),
     confidence,
     status,
     notes,
-    effectivePotassiumMmolL: Number(k.toFixed(2)),
-    rawPotassiumMmolL: metab.vitreousPotassiumMmolL,
+    effectivePotassiumMmolL: Number((k ?? 4.0).toFixed(2)),
+    rawPotassiumMmolL: metab.vitreousPotassiumMmolL ?? 4.0,
     kExcessSubtracted: kExcess,
     dehydrationRatio: hypernatremicRatio,
     naPmiEstimate: undefined,
-    pmiMadea: Number(pmiMadea.toFixed(1)),
-    pmiSturner: Number(pmiSturner.toFixed(1)),
+    pmiMadea: Number((pmiMadea || 1.0).toFixed(1)),
+    pmiSturner: Number((pmiSturner || 1.0).toFixed(1)),
   };
 }
 
@@ -589,7 +585,8 @@ export function detectInconsistencies(
   decomp: DecompositionData,
   entomology: EntomologyData,
   metabolomics: MetabolomicsData,
-  evals: Record<string, { minHours: number; maxHours: number; optimalHours: number }>
+  evals: Record<string, { minHours: number; maxHours: number; optimalHours: number }>,
+  baselineCase?: ForensicCaseInput | null
 ): InconsistencyAlert[] {
   const alerts: InconsistencyAlert[] = [];
 
@@ -704,6 +701,89 @@ export function detectInconsistencies(
     });
   }
 
+  // 7. Sequential re-examination & modifier discrepancy checks (Examiner Change Awareness)
+  if (baselineCase) {
+    // 7a. Livor Fixation Reversal
+    if (baselineCase.livorMortis?.enabled && livor.enabled) {
+      if (
+        baselineCase.livorMortis.blanchability === "fixed_unblanchable" &&
+        (livor.blanchability === "fully_blanchable" || livor.blanchability === "partially_blanchable")
+      ) {
+        alerts.push({
+          id: "alert-seq-livor-reversal",
+          severity: "critical",
+          title: "Sequential Conflict: Livor Mortis Fixation Reversal",
+          description: `Hypostasis was recorded as fixed (unblanchable) at initial scene baseline, but subsequently adjusted to '${livor.blanchability.replace(/_/g, " ")}'. Intravascular blood hemolysis and dermal fixation cannot physiologically revert to blanchable.`,
+          indicatorA: "Scene Baseline Livor (Fixed)",
+          indicatorB: "Current Livor (Blanchable)",
+          forensicImplication: "Verify whether pressure blanching was tested on a secondary anatomical area, or if the scene observation was recorded in error.",
+        });
+      }
+    }
+
+    // 7b. Retrograde Rigor Mortis
+    if (baselineCase.rigorMortis?.enabled && rigor.enabled) {
+      if (
+        (baselineCase.rigorMortis.progressionStage === "complete_generalized" || baselineCase.rigorMortis.progressionStage === "moderate_upper_trunk") &&
+        (rigor.progressionStage === "absent_early" || rigor.progressionStage === "developing_jaw_neck")
+      ) {
+        alerts.push({
+          id: "alert-seq-rigor-reversal",
+          severity: "critical",
+          title: "Sequential Conflict: Retrograde Rigor Stiffening",
+          description: "Rigor mortis was recorded as complete/generalized at scene baseline, but has been adjusted backwards to an earlier developing stage. Rigor does not regress backwards unless muscle fibers were forcibly broken during body transport.",
+          indicatorA: "Scene Rigor (Complete)",
+          indicatorB: "Current Rigor (Early/Developing)",
+          forensicImplication: "Check if rigor was mechanically disrupted during transport or if resolution (secondary flaccidity) is developing.",
+        });
+      }
+    }
+
+    // 7c. Core Temperature Elevation without External Heating
+    if (baselineCase.algorMortis?.enabled && algor.enabled) {
+      if (algor.rectalTempC > baselineCase.algorMortis.rectalTempC + 0.6 && meta.ambientTempC < algor.rectalTempC) {
+        alerts.push({
+          id: "alert-seq-algor-rise",
+          severity: "warning",
+          title: "Sequential Anomaly: Core Temperature Elevation Post-Scene",
+          description: `Current rectal core temperature (${algor.rectalTempC.toFixed(1)}°C) is higher than initial scene baseline (${baselineCase.algorMortis.rectalTempC.toFixed(1)}°C) despite ambient environment being colder (${meta.ambientTempC.toFixed(1)}°C).`,
+          indicatorA: "Scene Core Temp",
+          indicatorB: "Current Core Temp",
+          forensicImplication: "Check probe insertion depth, thermometer calibration, or external heating sources (e.g. heated transport vehicle).",
+        });
+      }
+    }
+
+    // 7d. Entomological Stage Regression
+    if (baselineCase.entomology?.enabled && entomology.enabled) {
+      const stageOrder: Record<string, number> = {
+        none: 0,
+        eggs: 1,
+        larva_instar_1: 2,
+        larva_instar_2: 3,
+        larva_instar_3_feeding: 4,
+        larva_instar_3_wandering: 5,
+        pupae: 6,
+        empty_puparia: 7,
+        adult_emerged: 8,
+        dermestid_beetles: 9,
+      };
+      const baseStageRank = stageOrder[baselineCase.entomology.developmentalStage] ?? 0;
+      const currStageRank = stageOrder[entomology.developmentalStage] ?? 0;
+      if (baseStageRank > 2 && currStageRank < baseStageRank) {
+        alerts.push({
+          id: "alert-seq-entomology-regression",
+          severity: "warning",
+          title: "Sequential Anomaly: Insect Colonization Stage Regression",
+          description: `Entomological stage entered ('${entomology.developmentalStage.replace(/_/g, " ")}') is younger than initial scene collection ('${baselineCase.entomology.developmentalStage.replace(/_/g, " ")}'). Insect development is strictly forward-progressing.`,
+          indicatorA: "Scene Insect Stage",
+          indicatorB: "Current Insect Stage",
+          forensicImplication: "May indicate sample mislabeling or secondary colonization wave (superposition of multiple oviposition cohorts).",
+        });
+      }
+    }
+  }
+
   return alerts;
 }
 
@@ -782,6 +862,10 @@ export function calculateCompositePmi(
   if (metabolomicsEval) evalsMap.metabolomics = metabolomicsEval;
 
 
+  const baselineCase = "caseId" in caseInputOrMeta
+    ? getBaselineCase(caseInputOrMeta as ForensicCaseInput)
+    : null;
+
   const inconsistencyAlerts = detectInconsistencies(
     metadata,
     algor,
@@ -790,7 +874,8 @@ export function calculateCompositePmi(
     decomp,
     entomology,
     metabolomics,
-    evalsMap
+    evalsMap,
+    baselineCase
   );
 
   // Dynamic indicator weighting based on physiological reliable window

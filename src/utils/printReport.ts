@@ -678,7 +678,7 @@ export function generateForensicReportHtml(
             </td>
             <td>
               ${caseData.metabolomics.enabled
-                ? `[K⁺]: ${caseData.metabolomics.vitreousPotassiumMmolL} mmol/L (Madea/Sturner) ${caseData.metabolomics.vitreousHypoxanthineUmolL ? `| Hypoxanthine: ${caseData.metabolomics.vitreousHypoxanthineUmolL} µmol/L` : ""} ${caseData.metabolomics.suspectedRenalFailureOrTrauma ? "(Renal Caveat)" : ""}`
+                ? `${caseData.metabolomics.selectedMetabolites?.length || 0} Analytes Loaded ${caseData.metabolomics.selectedMetabolites?.length ? `(${caseData.metabolomics.selectedMetabolites.map(m => m.name).slice(0, 3).join(", ")})` : ""}`
                 : `<span style="color: #64748b; font-style: italic;">Bypassed / Disabled</span>`}
             </td>
             <td style="font-family: monospace; color: #2dd4bf; font-weight: 700;">
@@ -1289,11 +1289,11 @@ export function exportForensicCaseReportPdf(
     doc.setFontSize(6.5);
     doc.setTextColor(203, 213, 225);
     doc.text(`Taxon: ${caseData.entomology.enabled ? caseData.entomology.primaryInsectGroup.replace(/_/g, " ") : "N/A"} | Stage: ${caseData.entomology.developmentalStage}`, mCol1, mY);
-    doc.text(`Vitreous [K+]: ${caseData.metabolomics.enabled ? `${caseData.metabolomics.vitreousPotassiumMmolL} mmol/L` : "N/A"}`, mCol2, mY);
+    doc.text(`Active Analytes: ${caseData.metabolomics.enabled ? `${caseData.metabolomics.selectedMetabolites?.length || 0} of 11 markers` : "Bypassed / Disabled"}`, mCol2, mY);
     mY += 3.2;
 
     doc.text(`Larval Length: ${caseData.entomology.larvalLengthMm}mm | Maggot Temp: ${caseData.entomology.maggotMassTempC}°C | Access: ${caseData.entomology.indoorAccessDelayHours}h`, mCol1, mY);
-    doc.text(`Hypoxanthine: ${caseData.metabolomics.vitreousHypoxanthineUmolL || "N/A"} µmol/L | Renal Caveat: ${caseData.metabolomics.suspectedRenalFailureOrTrauma ? "Present" : "None"}`, mCol2, mY);
+    doc.text(`Panel: ${caseData.metabolomics.enabled && caseData.metabolomics.selectedMetabolites?.length ? caseData.metabolomics.selectedMetabolites.map(m => m.name).slice(0, 2).join(", ") : "N/A"}`, mCol2, mY);
 
     y += 67;
 

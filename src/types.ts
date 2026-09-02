@@ -149,14 +149,14 @@ export interface ActiveMetaboliteItem {
 
 export interface MetabolomicsData {
   enabled: boolean;
-  vitreousPotassiumMmolL: number; // 3.5 - 20 mmol/L
+  vitreousPotassiumMmolL?: number; // 3.5 - 20 mmol/L
   vitreousHypoxanthineUmolL?: number;
   vitreousLactateMmolL?: number;
   ureaNitrogenMgDl?: number;
   vitreousSodiumMmolL?: number;
   selectedMetabolites?: ActiveMetaboliteItem[];
   sampleCollectionDateTime?: string;
-  suspectedRenalFailureOrTrauma: boolean;
+  suspectedRenalFailureOrTrauma?: boolean;
   recordedAt?: string; // Timing of examiner indicator observation/entry
 }
 
@@ -422,6 +422,9 @@ export interface ForensicCaseInput {
   isHarmonicPreset?: boolean;
   isPresetModified?: boolean;
   presetModifiedAt?: string;
+  sceneBaseline?: ForensicCaseInput;
+  isSceneBaselineLocked?: boolean;
+  sceneBaselineLockedAt?: string;
   ageYears?: number;
   sex: "male" | "female" | "unknown";
   discoveryTimestamp: string;

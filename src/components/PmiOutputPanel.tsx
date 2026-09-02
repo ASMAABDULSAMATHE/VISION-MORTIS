@@ -125,12 +125,13 @@ export const PmiOutputPanel: React.FC<Props> = ({
   const confStyle = getConfidenceStyle(result.confidenceScore, result.confidenceTier);
 
   // Format hours/days display
-  const formatHoursOrDays = (hours: number) => {
-    if (hours < 36) {
-      return `${hours} hrs`;
+  const formatHoursOrDays = (hours: number | undefined | null) => {
+    const val = typeof hours === "number" && !isNaN(hours) ? hours : 0;
+    if (val < 36) {
+      return `${val} hrs`;
     }
-    const days = (hours / 24).toFixed(1);
-    return `${hours} hrs (~${days} days)`;
+    const days = (val / 24).toFixed(1);
+    return `${val} hrs (~${days} days)`;
   };
 
   return (
@@ -364,7 +365,7 @@ export const PmiOutputPanel: React.FC<Props> = ({
                       {mlPredictionData.estimatedPmiOptimalHours} <span className="text-xs text-slate-400">hours</span>
                     </div>
                     <div className="text-[11px] text-slate-400 mt-0.5">
-                      ({(mlPredictionData.estimatedPmiOptimalHours / 24).toFixed(1)} days)
+                      ({((mlPredictionData.estimatedPmiOptimalHours ?? 0) / 24).toFixed(1)} days)
                     </div>
                   </div>
 
