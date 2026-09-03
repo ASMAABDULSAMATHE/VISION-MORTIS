@@ -479,7 +479,12 @@ export function generateForensicReportHtml(
       </div>
       <div class="data-pill">
         <div class="data-label">Discovery Time</div>
-        <div class="data-value">${caseData.discoveryTimestamp ? new Date(caseData.discoveryTimestamp).toLocaleString() : "Unrecorded"}</div>
+        <div class="data-value">${(() => {
+          if (!caseData.discoveryTimestamp) return "Unrecorded";
+          const s = caseData.discoveryTimestamp.trim();
+          const d = new Date(s.includes(" ") && !s.includes("T") ? s.replace(" ", "T") : s);
+          return isNaN(d.getTime()) ? caseData.discoveryTimestamp : d.toLocaleString();
+        })()}</div>
       </div>
       <div class="data-pill">
         <div class="data-label">Scene Posture</div>

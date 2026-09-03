@@ -1056,8 +1056,16 @@ export function calculateCompositePmi(
   else if (finalConfidence < 75) confidenceTier = "Moderate Confidence";
 
   // Calculate Time of Death timestamps from discoveryDateTime
-  const discoveryDate = metadata.discoveryDateTime ? new Date(metadata.discoveryDateTime) : new Date();
-  const validDiscovery = !isNaN(discoveryDate.getTime()) ? discoveryDate : new Date();
+  let discoveryDate = new Date();
+  if (metadata.discoveryDateTime && metadata.discoveryDateTime.trim()) {
+    const rawStr = metadata.discoveryDateTime.trim();
+    const isoSafeStr = rawStr.includes(" ") && !rawStr.includes("T") ? rawStr.replace(" ", "T") : rawStr;
+    const parsed = new Date(isoSafeStr);
+    if (!isNaN(parsed.getTime())) {
+      discoveryDate = parsed;
+    }
+  }
+  const validDiscovery = discoveryDate;
 
   const todMinDate = new Date(validDiscovery.getTime() - weightedMax * 3600 * 1000);
   const todMaxDate = new Date(validDiscovery.getTime() - weightedMin * 3600 * 1000);

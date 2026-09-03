@@ -761,7 +761,11 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
             <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800">
               <div className="text-[11px] text-slate-500">Discovery Timestamp</div>
               <div className="font-mono text-xs font-semibold text-slate-200 mt-0.5">
-                {caseData.discoveryTimestamp ? new Date(caseData.discoveryTimestamp).toLocaleString() : "Not Recorded"}
+                {caseData.discoveryTimestamp ? (() => {
+                  const s = caseData.discoveryTimestamp.trim();
+                  const d = new Date(s.includes(" ") && !s.includes("T") ? s.replace(" ", "T") : s);
+                  return isNaN(d.getTime()) ? caseData.discoveryTimestamp : d.toLocaleString();
+                })() : "Not Recorded"}
               </div>
               <div className="text-[10px] text-slate-400 mt-1 truncate">
                 Location: {caseData.locationDescription || "Scene"}

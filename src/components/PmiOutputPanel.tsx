@@ -270,8 +270,8 @@ export const PmiOutputPanel: React.FC<Props> = ({
       {/* Analytical Tabbed Panel */}
       <div className="rounded-xl bg-slate-900/90 border border-slate-800 p-5 space-y-4">
         {/* Navigation Tabs */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-2 min-w-max pb-1">
             {[
               { id: "attribution", label: "Factor Attribution", icon: BarChart3 },
               { id: "ml_shap", label: "XGBoost ML + TreeSHAP (212 Features)", icon: Cpu },
@@ -286,7 +286,7 @@ export const PmiOutputPanel: React.FC<Props> = ({
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                  className={`px-3 sm:px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-all cursor-pointer ${
                     isActive
                       ? tab.id === "ml_shap"
                         ? "bg-emerald-950 border border-emerald-500/80 text-emerald-300 shadow-sm"
@@ -577,8 +577,8 @@ export const PmiOutputPanel: React.FC<Props> = ({
             {/* Individual Indicator Detailed Diagnostics Table */}
             <div className="mt-4 border-t border-slate-800/80 pt-4">
               <h4 className="text-xs font-semibold text-slate-300 mb-2.5">Indicator Reliability Windows</h4>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
+              <div className="overflow-x-auto no-scrollbar">
+                <table className="w-full text-left text-xs border-collapse min-w-[540px]">
                   <thead>
                     <tr className="border-b border-slate-800 text-slate-400 text-xs">
                       <th className="pb-2 font-medium">Indicator</th>

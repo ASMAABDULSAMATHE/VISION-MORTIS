@@ -55,12 +55,88 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 
+// Function to create a clean fresh case for opening or resetting
+const createBlankCase = (): ForensicCaseInput => ({
+  caseId: generateValidCaseId(),
+  subjectNameOrIdentifier: "",
+  ageYears: undefined,
+  sex: "unknown",
+  discoveryTimestamp: getFormattedCurrentTimestamp(),
+  locationDescription: "",
+  investigatorName: "",
+  ambientTempC: 22.0,
+  relativeHumidityPercent: 50,
+  bodyWeightKg: 70,
+  bodyFoundPosition: "supine",
+  algorMortis: {
+    enabled: false,
+    rectalTempC: 37.0,
+    ambientTempC: 22.0,
+    bodyWeightKg: 70,
+    clothingCoveringFactor: 1.0,
+    clothingDescription: "",
+    isBodyWet: false,
+    airCurrentVelocity: "still",
+  },
+  livorMortis: {
+    enabled: false,
+    blanchability: "absent",
+    colorHue: "violaceous",
+    distributionPattern: "dependent_pressure_spared",
+    lividityPositionFound: "supine",
+    suspectedBodyMovement: false,
+    notes: "",
+  },
+  rigorMortis: {
+    enabled: false,
+    progressionStage: "absent_early",
+    muscleGroups: {
+      jawTemporomandibular: false,
+      neckCervical: false,
+      upperLimbsElbowsWrists: false,
+      trunkAbdomen: false,
+      lowerLimbsKneesAnkles: false,
+    },
+    preDeathPhysicalExertion: "none_at_rest",
+    coldStiffeningSuspected: false,
+  },
+  decomposition: {
+    enabled: false,
+    headNeckScore: 1,
+    trunkScore: 1,
+    limbsScore: 1,
+    totalBodyScore: 3,
+    marblingPresent: false,
+    rightIliacDiscoloration: false,
+    bloatingAndPurge: false,
+    skinSlippageBullae: false,
+    mummificationOrAdipocere: false,
+    skeletonizationBoneExposed: false,
+    effectiveMeanTempC: 22.0,
+  },
+  entomology: {
+    enabled: false,
+    primaryInsectGroup: "none",
+    developmentalStage: "none",
+    larvalLengthMm: 0,
+    maggotMassTempC: 22.0,
+    indoorAccessDelayHours: 0,
+  },
+  metabolomics: {
+    enabled: false,
+    vitreousPotassiumMmolL: 4.0,
+    vitreousHypoxanthineUmolL: undefined,
+    selectedMetabolites: [],
+    suspectedRenalFailureOrTrauma: false,
+  },
+});
+
 export default function App() {
   // Page / View Routing: "workspace" (Data entry & analysis) vs "report" (Standardized case document)
   const [activePage, setActivePage] = useState<"workspace" | "report">("workspace");
 
-  // Case State (initialized with Preset 1: Fresh Indoor Case)
-  const [caseData, setCaseData] = useState<ForensicCaseInput>(FORENSIC_PRESETS[0]);
+  // Case State (initialized with clean fresh case; discovery timestamp captured at load time)
+  const [caseData, setCaseData] = useState<ForensicCaseInput>(() => createBlankCase());
   const [activeWorkflowSection, setActiveWorkflowSection] = useState<string>("overview");
 
   // Accordion management: active open module ID - defaulted to null (indicators dropdowns closed by default)
@@ -124,82 +200,9 @@ export default function App() {
   const isWeightModified = !!(baseline && caseData.bodyWeightKg !== baseline.bodyWeightKg);
   const baseWeight = baseline?.bodyWeightKg;
 
-  // Reset to pure empty blank template (everything cleared)
+  // Reset to pure empty blank template (everything cleared, fresh timestamp & valid ID generated)
   const handleResetBlank = () => {
-    setCaseData({
-      caseId: "",
-      subjectNameOrIdentifier: "",
-      ageYears: undefined,
-      sex: "unknown",
-      discoveryTimestamp: "",
-      locationDescription: "",
-      investigatorName: "",
-      ambientTempC: 20.0,
-      relativeHumidityPercent: 50,
-      bodyWeightKg: 70,
-      bodyFoundPosition: "supine",
-      algorMortis: {
-        enabled: false,
-        rectalTempC: 37.0,
-        ambientTempC: 20.0,
-        bodyWeightKg: 70,
-        clothingCoveringFactor: 1.0,
-        clothingDescription: "",
-        isBodyWet: false,
-        airCurrentVelocity: "still",
-      },
-      livorMortis: {
-        enabled: false,
-        blanchability: "absent",
-        colorHue: "violaceous",
-        distributionPattern: "dependent",
-        lividityPositionFound: "supine",
-        suspectedBodyMovement: false,
-        notes: "",
-      },
-      rigorMortis: {
-        enabled: false,
-        progressionStage: "absent_early",
-        muscleGroups: {
-          jawTemporomandibular: false,
-          neckCervical: false,
-          upperLimbsElbowsWrists: false,
-          trunkAbdomen: false,
-          lowerLimbsKneesAnkles: false,
-        },
-        preDeathPhysicalExertion: "none_at_rest",
-        coldStiffeningSuspected: false,
-      },
-      decomposition: {
-        enabled: false,
-        headNeckScore: 1,
-        trunkScore: 1,
-        limbsScore: 1,
-        totalBodyScore: 3,
-        marblingPresent: false,
-        rightIliacDiscoloration: false,
-        bloatingAndPurge: false,
-        skinSlippageBullae: false,
-        mummificationOrAdipocere: false,
-        skeletonizationBoneExposed: false,
-        effectiveMeanTempC: 20.0,
-      },
-      entomology: {
-        enabled: false,
-        primaryInsectGroup: "none",
-        developmentalStage: "none",
-        larvalLengthMm: 0,
-        maggotMassTempC: 20.0,
-        indoorAccessDelayHours: 0,
-      },
-      metabolomics: {
-        enabled: false,
-        vitreousPotassiumMmolL: 4.0,
-        vitreousHypoxanthineUmolL: undefined,
-        activeMetabolites: [],
-        suspectedRenalFailureOrTrauma: false,
-      },
-    });
+    setCaseData(createBlankCase());
     setAiSynthesisData(null);
     setVisionData({ analyzing: false, images: [] });
     setActiveAccordionModule(null);
@@ -778,8 +781,12 @@ export default function App() {
                   return (
                     <>
                       <select
-                        value={activePresetIdx >= 0 ? activePresetIdx : ""}
+                        value={activePresetIdx >= 0 ? activePresetIdx : "new"}
                         onChange={(e) => {
+                          if (e.target.value === "new") {
+                            handleResetBlank();
+                            return;
+                          }
                           const idx = parseInt(e.target.value, 10);
                           if (!isNaN(idx) && FORENSIC_PRESETS[idx]) {
                             setCaseData(FORENSIC_PRESETS[idx]);
@@ -788,13 +795,28 @@ export default function App() {
                         }}
                         className="w-full bg-slate-900 border border-slate-700/80 hover:border-teal-500/80 rounded-lg px-2 py-1.5 text-[11px] text-teal-300 focus:outline-none focus:border-teal-400 cursor-pointer truncate"
                       >
-                        <option value="" disabled>Select benchmark preset...</option>
-                        {FORENSIC_PRESETS.map((preset, idx) => (
-                          <option key={preset.presetId || preset.caseId || idx} value={idx}>
-                            {preset.presetName || `${preset.caseId}: ${preset.subjectNameOrIdentifier}`}
-                          </option>
-                        ))}
+                        <option value="new">
+                          {presetAudit.isPreset ? "✦ Start Clean Blank Case" : "✦ Custom / Non-Preset Case (Active)"}
+                        </option>
+                        <optgroup label="Load Benchmark Preset:">
+                          {FORENSIC_PRESETS.map((preset, idx) => (
+                            <option key={preset.presetId || preset.caseId || idx} value={idx}>
+                              {preset.presetName || `${preset.caseId}: ${preset.subjectNameOrIdentifier}`}
+                            </option>
+                          ))}
+                        </optgroup>
                       </select>
+
+                      {/* Custom Non-Preset Status indicator in sidebar */}
+                      {!presetAudit.isPreset && !presetAudit.isSceneBaseline && (
+                        <div className="mt-1 text-[10px] text-slate-400 font-medium truncate flex items-center justify-between gap-1.5">
+                          <span className="flex items-center gap-1.5 truncate">
+                            <span className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0"></span>
+                            <span className="truncate">Custom Investigator Casework</span>
+                          </span>
+                          <span className="text-[9px] text-teal-400/80 font-mono">Clean State</span>
+                        </div>
+                      )}
 
                       {/* Baseline Modification Status Badge in Sidebar */}
                       {(presetAudit.isPreset || presetAudit.isSceneBaseline) && (
@@ -936,12 +958,60 @@ export default function App() {
             <div className="pt-2 border-t border-slate-800/80 space-y-1 text-xs">
               <button
                 type="button"
-                onClick={() => openSidePanel("indicators")}
-                className="w-full text-left p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 flex items-center justify-between cursor-pointer"
+                onClick={() => {
+                  if (window.innerWidth < 1024) setIsWorkflowSidebarOpen(false);
+                  openSidePanel("indicators");
+                }}
+                className="w-full text-left p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 flex items-center justify-between cursor-pointer transition-colors"
               >
                 <span className="flex items-center gap-2">
                   <Layers className="w-3.5 h-3.5 text-teal-400" />
                   <span>Indicator Matrix</span>
+                </span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.innerWidth < 1024) setIsWorkflowSidebarOpen(false);
+                  openSidePanel("about");
+                }}
+                className="w-full text-left p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 flex items-center justify-between cursor-pointer transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Info className="w-3.5 h-3.5 text-teal-400" />
+                  <span>About VisionMortis</span>
+                </span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.innerWidth < 1024) setIsWorkflowSidebarOpen(false);
+                  openSidePanel("guide");
+                }}
+                className="w-full text-left p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 flex items-center justify-between cursor-pointer transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <BookOpen className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Examiner User Guide</span>
+                </span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.innerWidth < 1024) setIsWorkflowSidebarOpen(false);
+                  openSidePanel("limitations");
+                }}
+                className="w-full text-left p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 flex items-center justify-between cursor-pointer transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Protocol Limitations</span>
                 </span>
                 <ChevronRight className="w-3.5 h-3.5 text-slate-600" />
               </button>
@@ -1020,12 +1090,25 @@ export default function App() {
                   <div>
                     <div className="text-[11px] text-slate-400 font-medium">Real-Time Composite PMI</div>
                     <div className="flex items-baseline gap-2">
-                      <span className="text-xl font-bold font-mono text-teal-400">
-                        {pmiResult.estimatedPmiOptimalHours} Hours
-                      </span>
-                      <span className="text-xs font-mono text-slate-400">
-                        ({pmiResult.estimatedPmiMinHours}–{pmiResult.estimatedPmiMaxHours}h window)
-                      </span>
+                      {pmiResult.indicatorEvaluations.length > 0 ? (
+                        <>
+                          <span className="text-xl font-bold font-mono text-teal-400">
+                            {pmiResult.estimatedPmiOptimalHours} Hours
+                          </span>
+                          <span className="text-xs font-mono text-slate-400">
+                            ({pmiResult.estimatedPmiMinHours}–{pmiResult.estimatedPmiMaxHours}h window)
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-sm sm:text-base font-bold text-teal-400">
+                            Awaiting Forensic Indicators
+                          </span>
+                          <span className="text-xs text-slate-400 hidden sm:inline">
+                            (Enable markers below or load a preset)
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1119,28 +1202,67 @@ export default function App() {
                         (p) => (caseData.presetId && p.presetId === caseData.presetId) || p.caseId === caseData.caseId
                       );
                       return (
-                        <select
-                          value={activePresetIdx >= 0 ? activePresetIdx : ""}
-                          onChange={(e) => {
-                            const idx = parseInt(e.target.value, 10);
-                            if (!isNaN(idx) && FORENSIC_PRESETS[idx]) {
-                              setCaseData(FORENSIC_PRESETS[idx]);
-                              setAiSynthesisData(null);
-                            }
-                          }}
-                          className="w-full lg:w-72 max-w-full truncate bg-slate-900 lg:bg-slate-950 border border-slate-700/80 hover:border-teal-500/80 rounded-xl px-2.5 py-1.5 text-xs text-teal-300 focus:outline-none focus:border-teal-400 cursor-pointer shadow-sm"
-                        >
-                          <option value="" disabled>Load benchmark case...</option>
-                          {FORENSIC_PRESETS.map((preset, idx) => (
-                            <option key={preset.presetId || preset.caseId || idx} value={idx}>
-                              {preset.presetName || `${preset.caseId}: ${preset.subjectNameOrIdentifier}`}
+                        <div className="flex items-center gap-1.5 flex-1">
+                          <select
+                            value={activePresetIdx >= 0 ? activePresetIdx : "new"}
+                            onChange={(e) => {
+                              if (e.target.value === "new") {
+                                handleResetBlank();
+                                return;
+                              }
+                              const idx = parseInt(e.target.value, 10);
+                              if (!isNaN(idx) && FORENSIC_PRESETS[idx]) {
+                                setCaseData(FORENSIC_PRESETS[idx]);
+                                setAiSynthesisData(null);
+                              }
+                            }}
+                            className="w-full lg:w-72 max-w-full truncate bg-slate-900 lg:bg-slate-950 border border-slate-700/80 hover:border-teal-500/80 rounded-xl px-2.5 py-1.5 text-xs text-teal-300 focus:outline-none focus:border-teal-400 cursor-pointer shadow-sm"
+                          >
+                            <option value="new">
+                              {presetAudit.isPreset ? "✦ Start Clean Blank Case" : "✦ Custom / Non-Preset Case (Active)"}
                             </option>
-                          ))}
-                        </select>
+                            <optgroup label="Standard Forensic Benchmark Presets:">
+                              {FORENSIC_PRESETS.map((preset, idx) => (
+                                <option key={preset.presetId || preset.caseId || idx} value={idx}>
+                                  {preset.presetName || `${preset.caseId}: ${preset.subjectNameOrIdentifier}`}
+                                </option>
+                              ))}
+                            </optgroup>
+                          </select>
+                          {presetAudit.isPreset && (
+                            <button
+                              type="button"
+                              onClick={handleResetBlank}
+                              className="px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 hover:border-teal-500/80 text-[11px] font-medium text-slate-300 hover:text-teal-300 transition-colors shrink-0 flex items-center gap-1 cursor-pointer"
+                              title="Start a fresh blank case"
+                            >
+                              <RotateCcw className="w-3 h-3 text-teal-400" />
+                              <span className="hidden sm:inline">New Case</span>
+                            </button>
+                          )}
+                        </div>
                       );
                     })()}
                   </div>
                 </div>
+
+                {/* Non-Preset Status Notice in Section 1 */}
+                {!presetAudit.isPreset && !presetAudit.isSceneBaseline && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 rounded-lg bg-teal-950/30 border border-teal-800/50 text-teal-300 text-xs">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                      <span className="font-semibold text-[11px]">
+                        Clean Case Active
+                      </span>
+                      <span className="text-[10px] text-slate-400 hidden sm:inline">
+                        • Discovery time initialized ({caseData.discoveryTimestamp})
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      Toggle on any marker below or select a benchmark preset above.
+                    </div>
+                  </div>
+                )}
 
                 {/* Baseline Modification Status Row in Section 1 */}
                 {(presetAudit.isPreset || presetAudit.isSceneBaseline) && (
@@ -1298,9 +1420,19 @@ export default function App() {
 
                 {/* Discovery Time */}
                 <div className="space-y-1">
-                  <label className="text-slate-400 font-medium flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-teal-400" /> Discovery Timestamp
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-slate-400 font-medium flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-teal-400" /> Discovery Timestamp
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setCaseData({ ...caseData, discoveryTimestamp: getFormattedCurrentTimestamp() })}
+                      className="text-[10px] text-teal-400 hover:text-teal-300 flex items-center gap-1 cursor-pointer font-medium"
+                      title="Set to current date and time"
+                    >
+                      <Clock className="w-3 h-3" /> Set Now
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={caseData.discoveryTimestamp}

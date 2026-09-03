@@ -19,8 +19,8 @@ export const ResetConfirmationModal: React.FC<Props> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150">
-      <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden p-6 space-y-5 animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto animate-in fade-in duration-150">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto no-scrollbar bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-4 sm:p-6 space-y-4 sm:space-y-5 animate-in zoom-in-95 duration-150">
         {/* Modal Header */}
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3.5">
@@ -50,10 +50,9 @@ export const ResetConfirmationModal: React.FC<Props> = ({
             This will wipe the entire current case and reset all modules:
           </p>
           <ul className="list-disc pl-5 space-y-1 text-slate-400 text-xs">
-            <li>Case file number, subject demographics, and scene location will be cleared.</li>
-            <li>All uploaded computer vision photos and AI detections will be removed.</li>
-            <li>All examiner qualitative notes will be cleared.</li>
-            <li><strong>All 6 forensic modules (Algor, Livor, Rigor, TBS, Entomology, Metabolomics) will be switched OFF</strong> so that no defaults are chosen.</li>
+            <li>A fresh Case File Number will be generated, and discovery timestamp will be stamped to the current moment.</li>
+            <li>Subject demographics, scene location, photos, and notes will be cleared.</li>
+            <li><strong>All 6 forensic modules (Algor, Livor, Rigor, TBS, Entomology, Metabolomics) will be switched OFF</strong> so you start completely clean.</li>
           </ul>
         </div>
 
