@@ -159,8 +159,8 @@ Scientific literature underpinning each modality's synthetic modeling approach. 
 
 ## 7. Governance & Disclaimer
 
-VisionMortis is a research prototype for educational and experimental purposes. All case data in this dataset is literature/data-informed **synthetic** data — it does not represent real forensic cases and has not been validated against real forensic ground truth.
+VisionMortis is a research prototype for educational and experimental purposes. All case data in this dataset is literature/data-informed **synthetic** data - it does not represent real forensic cases and has not been validated against real forensic ground truth.
 
 This dataset does not provide definitive time-of-death determinations and should not be used as a standalone forensic method or as a replacement for validated forensic methodologies or expert judgment.
 
-Developed as part of an internship at the **International Center for Forensic Sciences (ICFS), Dubai Police** — Protocol One, 2026 (Ghaya, Ayesha, Asma, Fathima).
+Developed as part of an internship at the **International Center for Forensic Sciences (ICFS), Dubai Police** - Protocol One, 2026 (Ghaya, Ayesha, Asma, Fathima).
