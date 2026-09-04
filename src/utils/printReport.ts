@@ -2,6 +2,7 @@ import { ForensicCaseInput, PmiCalculationResult, VisionDetectionData } from "..
 import { jsPDF } from "jspdf";
 import { runInBrowserXgbPrediction, InBrowserPredictionResult } from "./inBrowserXgbModel";
 import { auditPresetModifications } from "./presetAudit";
+import { generateHenssgeCoolingSvg, generatePmiDistributionSvg } from "./chartExport";
 
 /**
  * Generates high-fidelity, self-contained standalone HTML for case reports.
@@ -23,6 +24,10 @@ export function generateForensicReportHtml(
 
   // Preset modification audit
   const presetAudit = auditPresetModifications(caseData);
+
+  // Vector graphics for HTML report
+  const henssgeSvg = generateHenssgeCoolingSvg(result, caseData);
+  const pmiDistSvg = generatePmiDistributionSvg(result, caseData);
 
   // Gather non-unrelated photos if any
   const imagesList = visionData?.images || [];
@@ -848,6 +853,36 @@ export function generateForensicReportHtml(
         </div>
       </div>
     ` : ""}
+
+    <!-- Analytical Graphics & Thermal Kinetics -->
+    <div class="section-card">
+      <div class="section-title">
+        <span>Analytical Graphics & Thermal Kinetics</span>
+        <span class="accent">Vector Trajectories</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px;">
+        <div style="background: #090d16; border: 1px solid #1e293b; border-radius: 8px; padding: 10px;">
+          <div style="font-size: 11px; font-weight: 700; color: #2dd4bf; margin-bottom: 6px;">Henssge Nomogram Cooling Kinetic Model</div>
+          <div style="width: 100%; overflow: hidden; border-radius: 6px;">
+            ${henssgeSvg}
+          </div>
+          <div style="font-size: 10px; color: #94a3b8; margin-top: 6px; display: flex; justify-content: space-between;">
+            <span>Rectal: <strong style="color: #2dd4bf;">${caseData.algorMortis?.rectalTempC ?? 37}°C</strong></span>
+            <span>Ambient: <strong>${caseData.ambientTempC ?? 20}°C</strong></span>
+          </div>
+        </div>
+        <div style="background: #090d16; border: 1px solid #1e293b; border-radius: 8px; padding: 10px;">
+          <div style="font-size: 11px; font-weight: 700; color: #34d399; margin-bottom: 6px;">Bayesian PMI Probability Density</div>
+          <div style="width: 100%; overflow: hidden; border-radius: 6px;">
+            ${pmiDistSvg}
+          </div>
+          <div style="font-size: 10px; color: #94a3b8; margin-top: 6px; display: flex; justify-content: space-between;">
+            <span>Consensus Optimum: <strong style="color: #34d399;">${result.estimatedPmiOptimalHours}h</strong></span>
+            <span>95% Credible Interval</span>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- 6. Physiological Consistency & Discordance Analysis -->
     <div class="section-card">

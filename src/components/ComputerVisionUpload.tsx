@@ -31,10 +31,12 @@ import {
   Sliders,
   RotateCcw,
   Activity,
+  Cpu,
 } from "lucide-react";
 import { UnrelatedIssueAlert } from "./UnrelatedIssueAlert";
 import { QualityBadge, QualityMeter, SingleImageQualityDetails } from "./VisionQualityCard";
 import { formatIndicatorTimestamp, getFormattedCurrentTimestamp } from "../utils/validation";
+import { runClientSideComputerVision } from "../utils/clientVisionEngine";
 
 interface Props {
   visionData: VisionDetectionData;
@@ -446,6 +448,7 @@ export const ComputerVisionUpload: React.FC<Props> = ({
   const [notes, setNotes] = useState(visionData.examinerNotes || visionData.investigatorNotes || "");
   const [zoomImage, setZoomImage] = useState<VisionImageItem | null>(null);
   const [showCalibration, setShowCalibration] = useState(false);
+  const [activeEngine, setActiveEngine] = useState<"server" | "client_canvas">("server");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isCollapsed = isOpen !== undefined ? !isOpen : internalCollapsed;
@@ -857,8 +860,13 @@ export const ComputerVisionUpload: React.FC<Props> = ({
         }),
       });
 
+      if (!res.ok) {
+        throw new Error(`Vision detection server endpoint unavailable (${res.status})`);
+      }
+
       const json = await res.json();
       if (json.success && json.data) {
+        setActiveEngine("server");
         // Merge findings, clarity, and reliability back into images
         const perFindings = json.data.perImageFindings || [];
         const mergedImages = imagesToAnalyze.map((img) => {
@@ -929,318 +937,37 @@ export const ComputerVisionUpload: React.FC<Props> = ({
         throw new Error(json.error || "Vision analysis returned no data");
       }
     } catch (err: any) {
-      console.warn("Vision detection heuristic fallback active:", err);
+      console.info("Server vision API unreachable (expected on static hosts like GitHub Pages); executing in-browser HTML5 Canvas Computer Vision engine.");
+      setActiveEngine("client_canvas");
+      const clientResult = await runClientSideComputerVision(imagesToAnalyze, contextNotes);
 
-      // Local fallback calculation with clarity & reliability
-      const hasMaggotTag = imagesToAnalyze.some((i) => i.tag === "entomology_larvae" && !i.isUnrelated);
-      const hasAbdomenTag = imagesToAnalyze.some((i) => i.tag === "abdomen_tbs" && !i.isUnrelated);
-      const hasCorneaTag = imagesToAnalyze.some((i) => i.tag === "face_cornea" && !i.isUnrelated);
-
-      let stage = "early_marbling";
-      let tbs = { headNeckScore: 3, trunkScore: 3, limbsScore: 2, totalScore: 8 };
-      let minH = 8;
-      let maxH = 24;
-
-      if (hasMaggotTag) {
-        stage = "active_decay";
-        tbs = { headNeckScore: 6, trunkScore: 7, limbsScore: 5, totalScore: 18 };
-        minH = 48;
-        maxH = 120;
-      } else if (hasAbdomenTag) {
-        stage = "bloating_purge";
-        tbs = { headNeckScore: 5, trunkScore: 5, limbsScore: 4, totalScore: 14 };
-        minH = 24;
-        maxH = 72;
-      }
-
-      let docCount = 0;
-      let livingCount = 0;
-      let unrelatedCount = 0;
-      let forensicCount = 0;
-
-      const fallbackIssues: UnrelatedImageIssue[] = [];
-
-      const updatedImages = imagesToAnalyze.map((img) => {
-        const lowerName = (img.name || "").toLowerCase();
-        let isUnrelated = img.isUnrelated ?? false;
-        let issueType: "handwritten_document" | "live_person" | "unrelated_object_scene" | undefined = undefined;
-        let issueDesc: string | undefined = undefined;
-        let warn = "✓ Verified post-mortem biological evidence.";
-
-        const isSafeForensic = isForensicSafelist(lowerName);
-
-        if (!isSafeForensic) {
-          if (
-            /\b(id|emirates_id|identity|passport|license|badge|screenshot|screen|capture|scan|pdf|doc|document|note|notes|text|paper|paperwork|report|rx|prescription|form|slip|receipt|invoice|contract)\b/i.test(lowerName) ||
-            /(id_card|emirates_id|identity_card|passport_copy|doc_scan|notes_photo|receipt_img)/i.test(lowerName)
-          ) {
-            docCount++;
-            isUnrelated = true;
-            issueType = "handwritten_document";
-            issueDesc = "Handwritten notes, paperwork, or documents detected. Excluded from calculations.";
-            warn = "📄 Issue: Handwritten document / text detected. Excluded from calculations.";
-            fallbackIssues.push({
-              imageId: img.id,
-              imageName: img.name,
-              issueType: "handwritten_document",
-              issueTitle: "Handwritten Note Excluded",
-              issueMessage: "Written notes contain textual documentation rather than biological signs of death.",
-              recommendation: "Upload anatomical body photos for decay and temperature analysis.",
-            });
-          } else if (
-            /\b(selfie|living|person|alive|portrait|boy|girl|man|woman|child|family|profile|me|vacation|party|self_portrait)\b/i.test(lowerName) ||
-            /(selfie_photo|living_person|family_pic|profile_picture)/i.test(lowerName)
-          ) {
-            livingCount++;
-            isUnrelated = true;
-            issueType = "live_person";
-            issueDesc = "Living person detected. Post-mortem time of death estimation requires physical biological signs of death.";
-            warn = "👤 Issue: Living person detected. Excluded from calculations.";
-            fallbackIssues.push({
-              imageId: img.id,
-              imageName: img.name,
-              issueType: "live_person",
-              issueTitle: "Living Person Excluded",
-              issueMessage: "Photo shows a living individual rather than a deceased subject.",
-              recommendation: "Ensure only deceased subject photos from the scene are uploaded.",
-            });
-          } else if (
-            /\b(dog|cat|pet|puppy|kitten|coffee|cup|mug|food|meal|pizza|burger|car|vehicle|traffic|meme|funny|nature|tree|building|desk|chair|room|interior)\b/i.test(lowerName)
-          ) {
-            unrelatedCount++;
-            isUnrelated = true;
-            issueType = "unrelated_object_scene";
-            issueDesc = "Non-forensic object or scenery detected without human remains.";
-            warn = "⚠️ Issue: Unrelated non-forensic photo detected. Excluded from calculations.";
-            fallbackIssues.push({
-              imageId: img.id,
-              imageName: img.name,
-              issueType: "unrelated_object_scene",
-              issueTitle: "Unrelated Item Excluded",
-              issueMessage: "Photo lacks human post-mortem remains.",
-              recommendation: "Upload direct photos of body remains.",
-            });
-          } else {
-            forensicCount++;
-          }
-        } else {
-          forensicCount++;
-        }
-
-        const relCat =
-          img.relevanceCategory ||
-          (issueType === "handwritten_document"
-            ? "writing_or_document"
-            : issueType === "live_person"
-            ? "live_human"
-            : issueType === "unrelated_object_scene"
-            ? "unrelated_object"
-            : isUnrelated
-            ? "unrelated_object"
-            : "deceased_human_forensic");
-
-        const catLabel =
-          img.categoryLabel ||
-          (relCat === "writing_or_document"
-            ? "ID Card / Document (Excluded)"
-            : relCat === "live_human"
-            ? "Living Subject (Excluded)"
-            : relCat === "unrelated_object"
-            ? "Unrelated Object / Scene (Excluded)"
-            : "Deceased Subject (Forensic)");
-
-        return {
-          ...img,
-          isUnrelated,
-          unrelatedIssueType: issueType,
-          unrelatedIssueDescription: issueDesc,
-          relevanceCategory: relCat,
-          categoryLabel: catLabel,
-          warningMessage: warn,
-          relevanceStatus: isUnrelated ? ("Unrelated / Non-Forensic" as const) : ("Forensic Biological Evidence" as const),
-          qualityRating: "Optimal" as const,
-          qualityNote: "Resolution suitable for visual assessment.",
-          clarityScore: isUnrelated ? (img.clarityScore ?? 80) : (img.clarityScore ?? 92),
-          clarityRating: "Optimal (Sharp & Well-Lit)" as const,
-          reliabilityScore: isUnrelated ? 0 : (img.reliabilityScore ?? 90),
-          reliabilityRating: isUnrelated ? ("Low / Questionable" as const) : ("Forensic-Grade (High Confidence)" as const),
-          clarityDetails: "Sharp focus & even illumination",
-          reliabilityDetails: isUnrelated
-            ? "Excluded from calculation"
-            : "Unobstructed anatomical landmarks",
-          forensicRecommendations: isUnrelated
-            ? "Upload post-mortem photos"
-            : "Adequate for diagnostic scoring",
-          detectedFindings: isUnrelated
-            ? (img.detectedFindings || "Non-forensic subject excluded from time of death calculations.")
-            : `Signs consistent with ${stage.replace(/_/g, " ")}.`,
-          pmiImplication: isUnrelated
-            ? "Excluded from post-mortem interval calculations."
-            : `Consistent with PMI window of ${minH} to ${maxH} hours.`,
-        };
-      });
-
-      const totalUnrelated = docCount + livingCount + unrelatedCount;
-      const allUnrelated = forensicCount === 0;
-
-      const calcClarity = forensicCount > 0 ? 92 : 80;
-      const calcReliability = forensicCount > 0 ? 90 : 0;
-
-      const validForensicImages = updatedImages.filter((i) => !i.isUnrelated);
-      const hasDualLivor =
-        validForensicImages.length >= 2 &&
-        ((validForensicImages.some((i) => i.tag === "anterior_body") &&
-          validForensicImages.some((i) => i.tag === "posterior_livor")) ||
-          contextNotes.toLowerCase().includes("move") ||
-          contextNotes.toLowerCase().includes("dual") ||
-          contextNotes.toLowerCase().includes("shift") ||
-          contextNotes.toLowerCase().includes("turn") ||
-          contextNotes.toLowerCase().includes("relocat"));
-
-      const movementDetected = !allUnrelated && validForensicImages.length >= 2 && hasDualLivor;
-
-      let obs = "";
-      if (allUnrelated) {
-        obs = "No deceased human remains were found in the uploaded photos. All images were recognized as written documents, living individuals, or unrelated items and were safely excluded.";
-      } else {
-        const stageName = stage.replace(/_/g, " ");
-        const movText = movementDetected ? " Dual discordant lividity indicates post-mortem body repositioning." : "";
-        obs = `Photo analysis indicates ${stageName} changes (TBS ${tbs.totalScore}/35) with violaceous hypostatic blood settling, pointing to an estimated time of death between ${minH} and ${maxH} hours ago.${movText}`;
-        if (totalUnrelated > 0) {
-          obs += ` (${totalUnrelated} non-forensic item(s) excluded).`;
-        }
-      }
-      const detectedMovement = {
-        suspectedMovement: movementDetected,
-        confidenceScore: movementDetected ? 88 : 0,
-        movementPattern: (movementDetected ? "dual_discordant_lividity" : "none_consistent") as
-          | "none_consistent"
-          | "dual_discordant_lividity"
-          | "shifted_pressure_blanching"
-          | "gravitational_discordance"
-          | "drag_marks_abrasions"
-          | "clothing_posture_discordance",
-        patternLabel: movementDetected
-          ? "Dual / Discordant Lividity Detected"
-          : allUnrelated
-          ? "No Biological Evidence"
-          : "Consistent Post-Mortem Posture",
-        description: movementDetected
-          ? "Visual evidence reveals hypostatic blood settling in two opposing anatomical planes (both anterior chest/abdomen and posterior back with distinct contact blanching points), establishing that the body was moved 2–8 hours post-mortem."
-          : allUnrelated
-          ? "No post-mortem biological remains available to assess body movement."
-          : "Lividity distribution, contact blanching, and biological settling are anatomically consistent with the discovery position.",
-        forensicIndicators: movementDetected
-          ? [
-              "Biphasic dependent hypostasis across opposing anatomical planes",
-              "Incongruent contact blanching areas on superior anatomical surfaces",
-              "Post-mortem body relocation detected (XGBoost cv_movement_confidence: 88%)",
-            ]
-          : allUnrelated
-          ? []
-          : ["Gravitational settling consistent with discovery posture"],
-        pmiImpactAssessment: movementDetected
-          ? "Primary lividity required at least 2–4 hours to establish initial pattern prior to relocation; secondary lividity confirms movement occurred before full fixation (2–8h post-mortem)."
-          : "No movement adjustment required for post-mortem interval calculations.",
-        incongruentSurfaces: movementDetected ? "Anterior chest/abdomen + Posterior gluteal/scapular regions" : "None (consistent)",
-        estimatedMovementWindowHours: movementDetected ? { min: 2, max: 8 } : undefined,
-      };
-
-      const currentNow = getFormattedCurrentTimestamp();
       onVisionUpdate({
         ...visionData,
-        images: updatedImages,
-        imagePreviewUrl: updatedImages[0]?.dataUrl,
+        images: clientResult.updatedImages,
+        imagePreviewUrl: clientResult.updatedImages[0]?.dataUrl,
         analyzing: false,
-        analyzedAt: currentNow,
-        recordedAt: currentNow,
-        detectedDecompositionStage: allUnrelated ? "fresh" : stage,
-        estimatedTbs: allUnrelated ? { headNeckScore: 1, trunkScore: 1, limbsScore: 1, totalScore: 3 } : tbs,
-        detectedLivor: {
-          colorClassification: "standard_violaceous",
-          distribution: movementDetected
-            ? "Dual discordant lividity: purple settling on both anterior and posterior anatomical planes"
-            : "Purple discoloration settling on lower body surfaces with pale contact areas",
-          estimatedFixation: hasMaggotTag ? "fully_fixed" : "partially_fixed",
-        },
-        detectedEntomology: {
-          insectsPresent: hasMaggotTag,
-          primaryInsectStage: hasMaggotTag ? "second_instar" : "none",
-          maggotMassPresent: hasMaggotTag,
-          description: hasMaggotTag
-            ? "Active young maggot clusters visible in body folds."
-            : "No visible insect activity on current photos.",
-        },
-        detectedOcularChanges: {
-          cornealClouding: hasCorneaTag ? "moderate_clouding" : "translucent_hazy",
-          tacheNoirePresent: false,
-          description: hasCorneaTag
-            ? "Moderate corneal haziness (~10–24h post-mortem)."
-            : "Eyes not clearly visible on submitted photos.",
-        },
-        detectedMovement,
-        unrelatedImagesDetected: totalUnrelated > 0,
-        unrelatedImageCount: totalUnrelated,
-        unrelatedIssuesList: fallbackIssues,
-        averageClarityScore: calcClarity,
-        averageReliabilityScore: calcReliability,
-        overallQualityAssessment: forensicCount > 0 ? "Forensic-Grade Evidence (High Sharpness & Landmark Resolution)" : "No Valid Forensic Body Photos",
-        clarityReliabilitySummary: {
-          optimalCount: forensicCount,
-          suboptimalCount: 0,
-          overallReliabilityTier: forensicCount > 0 ? "Forensic-Grade Evidence" : "Caution: Low Quality / Blur",
-          detailedRecommendations: [
-            "All valid forensic angles provide clear biological landmarks for decomposition and lividity.",
-            "Maintain perpendicular camera angles with non-glare macro illumination.",
-          ],
-        },
-        detectedCategoryBreakdown: {
-          documentsAndWritings: docCount,
-          livingPeople: livingCount,
-          unrelatedObjects: unrelatedCount,
-          forensicEvidence: forensicCount,
-        },
-        qualityWarning: null,
-        sceneObservations: [
-          `Analyzed ${imagesToAnalyze.length} submitted photo(s)`,
-          contextNotes ? `Examiner note: "${contextNotes}"` : "Standard indoor scene",
-          forensicCount > 0 ? `Image clarity (${calcClarity}%) and anatomical reliability (${calcReliability}%) verified` : "No deceased biological remains present",
-          movementDetected ? "Computer vision flagged dual-plane discordant lividity (body movement suspected)" : "Consistent gravitational settling",
-        ],
-        visualPmiWindowHours: allUnrelated
-          ? { min: 0, max: 0, confidence: 0 }
-          : { min: minH, max: maxH, confidence: 85 },
-        forensicObservations: obs,
         examinerNotes: contextNotes,
         investigatorNotes: contextNotes,
-        perImageFindings: updatedImages.map((img, idx) => ({
-          imageId: img.id,
-          tag: img.tag || "general",
-          isUnrelated: img.isUnrelated,
-          unrelatedIssueType: img.unrelatedIssueType,
-          unrelatedIssueDescription: img.unrelatedIssueDescription,
-          relevanceCategory: img.relevanceCategory,
-          categoryLabel: img.categoryLabel,
-          warningMessage: img.warningMessage,
-          relevanceStatus: img.relevanceStatus,
-          qualityRating: img.qualityRating,
-          qualityNote: img.qualityNote,
-          clarityScore: img.clarityScore,
-          clarityRating: img.clarityRating,
-          clarityDetails: img.clarityDetails,
-          reliabilityScore: img.reliabilityScore,
-          reliabilityRating: img.reliabilityRating,
-          reliabilityDetails: img.reliabilityDetails,
-          forensicRecommendations: img.forensicRecommendations,
-          findings: img.detectedFindings || `Photo ${idx + 1} analyzed.`,
-          pmiImplication: img.isUnrelated
-            ? "Excluded from calculations."
-            : `Aligns with post-mortem interval of approximately ${minH}–${maxH} hours.`,
-          movementSuspected: movementDetected && (img.tag === "anterior_body" || img.tag === "posterior_livor"),
-          movementDetails: movementDetected
-            ? "Discordant blood settling observed across anatomical plane."
-            : "No contradictory blood settling.",
-        })),
+        analyzedAt: getFormattedCurrentTimestamp(),
+        recordedAt: getFormattedCurrentTimestamp(),
+        detectedDecompositionStage: clientResult.detectedDecompositionStage,
+        estimatedTbs: clientResult.estimatedTbs,
+        detectedLivor: clientResult.detectedLivor,
+        detectedEntomology: clientResult.detectedEntomology,
+        detectedOcularChanges: clientResult.detectedOcularChanges,
+        detectedMovement: clientResult.detectedMovement,
+        unrelatedImagesDetected: clientResult.unrelatedImagesDetected,
+        unrelatedImageCount: clientResult.unrelatedImageCount,
+        unrelatedIssuesList: clientResult.unrelatedIssuesList,
+        averageClarityScore: clientResult.averageClarityScore,
+        averageReliabilityScore: clientResult.averageReliabilityScore,
+        overallQualityAssessment: clientResult.overallQualityAssessment,
+        clarityReliabilitySummary: clientResult.clarityReliabilitySummary,
+        detectedCategoryBreakdown: clientResult.detectedCategoryBreakdown,
+        sceneObservations: clientResult.sceneObservations,
+        visualPmiWindowHours: clientResult.visualPmiWindowHours,
+        forensicObservations: clientResult.forensicObservations,
+        perImageFindings: clientResult.perImageFindings,
       });
     } finally {
       setAnalyzing(false);

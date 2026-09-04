@@ -35,6 +35,7 @@ import { RecreatedLogo } from "./RecreatedLogo";
 import { validateCaseId, generateCaseIntegrityHash } from "../utils/validation";
 import { printForensicCaseReport, downloadForensicHtmlReport } from "../utils/printReport";
 import { ForensicPmiReportGraphic } from "./ForensicPmiReportGraphic";
+import { ReportVisualKinetics } from "./ReportVisualKinetics";
 import {
   downloadSvgAsPng,
   generateHenssgeCoolingSvg,
@@ -776,6 +777,9 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
               </div>
             )}
           </div>
+
+          {/* Analytical Graphics & Thermal Kinetics */}
+          <ReportVisualKinetics caseData={caseData} result={result} />
 
           {/* Examiner's Notes Section in Report (Rendered ONLY if examiner provided notes) */}
           {hasExaminerNotes && (

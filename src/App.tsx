@@ -4,6 +4,7 @@ import { FORENSIC_PRESETS } from "./data/forensicPresets";
 import { calculateCompositePmi } from "./utils/forensicCalculations";
 import { validateCaseId, generateValidCaseId, getFormattedCurrentTimestamp, formatIndicatorTimestamp } from "./utils/validation";
 import { auditPresetModifications } from "./utils/presetAudit";
+import { generateClientSidePathologySynthesis } from "./utils/clientSynthesisEngine";
 import { RecreatedLogo } from "./components/RecreatedLogo";
 import { AlgorMortisInput } from "./components/AlgorMortisInput";
 import { LivorMortisInput } from "./components/LivorMortisInput";
@@ -265,7 +266,7 @@ export default function App() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [autoExpandOnScroll, activeAccordionModule, activePage]);
 
-  // Trigger server-side Gemini AI Pathologist synthesis
+  // Trigger server-side Gemini AI Pathologist synthesis (or in-browser client synthesis on GitHub Pages)
   const handleRunAiSynthesis = async () => {
     setIsAiLoading(true);
     try {
@@ -282,26 +283,15 @@ export default function App() {
         const data = await response.json();
         setAiSynthesisData(data);
       } else {
-        // Fallback calculation synthesis
-        setAiSynthesisData({
-          expertSummary: `Multimodal analysis synthesizes an optimal Post-Mortem Interval of ${pmiResult.estimatedPmiOptimalHours} hours (calibrated range: ${pmiResult.estimatedPmiMinHours} to ${pmiResult.estimatedPmiMaxHours} hours). Estimated time of death corresponds to ${pmiResult.estimatedTimeOfDeathMin} through ${pmiResult.estimatedTimeOfDeathMax}.`,
-          recommendedConfirmatoryTests: [
-            "Vitreous humor electrolyte analysis ([K+] and hypoxanthine levels)",
-            "Gastric content digestive status and meal timeline confirmation",
-            "Scene ambient data logger temperature tracking over 48 hours",
-          ],
-        });
+        // Fallback to client-side forensic pathology synthesis engine (GitHub Pages compatible)
+        const clientSynthesis = generateClientSidePathologySynthesis(caseData, pmiResult);
+        setAiSynthesisData(clientSynthesis);
       }
     } catch (err) {
-      console.error("AI synthesis error:", err);
-      // Graceful clinical fallback
-      setAiSynthesisData({
-        expertSummary: `Multimodal analysis estimates PMI at ${pmiResult.estimatedPmiMinHours} to ${pmiResult.estimatedPmiMaxHours} hours, centering at ${pmiResult.estimatedPmiOptimalHours} hours. Core anchoring is driven by ${pmiResult.dominantIndicatorSummary.join(", ")}.`,
-        recommendedConfirmatoryTests: [
-          "Vitreous potassium [K+] concentration measurement",
-          "Review of scene temperature records and victim activity logs",
-        ],
-      });
+      console.warn("AI server synthesis unreachable (using client-side forensic synthesis):", err);
+      // Graceful clinical client-side fallback
+      const clientSynthesis = generateClientSidePathologySynthesis(caseData, pmiResult);
+      setAiSynthesisData(clientSynthesis);
     } finally {
       setIsAiLoading(false);
     }
