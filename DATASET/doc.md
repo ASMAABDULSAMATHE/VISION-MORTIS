@@ -2,7 +2,6 @@
 ## Master Multimodal Dataset - Reference Documentation
 
 > Case-level records are provided separately as [`visionmortis_master_multimodal.csv`](visionmortis_master_multimodal.csv).
-
 > Dataset Credits: Ahmed Sobeih - Generation of the synthetic, literature-informed dataset used in this project.
 
 ---
