@@ -3,8 +3,6 @@
 
 > Case-level records are provided separately as [`visionmortis_master_multimodal.csv`](visionmortis_master_multimodal.csv).
 
-> Dataset Credits: Ahmed Sobeih - Generation of the synthetic, literature-informed dataset used in this project.
-
 ---
 
 ## 1. Overview
@@ -166,3 +164,7 @@ VisionMortis is a research prototype for educational and experimental purposes. 
 This dataset does not provide definitive time-of-death determinations and should not be used as a standalone forensic method or as a replacement for validated forensic methodologies or expert judgment.
 
 Developed as part of an internship at the **International Center for Forensic Sciences (ICFS), Dubai Police** - Protocol One, 2026 (Ghaya, Ayesha, Asma, Fathima).
+
+## 8. Credits
+- Ahmed Sobeih - Generation of the synthetic, literature-informed dataset used in this project.
+- Ayesha Moazzam - Preprocessing and preparation of the dataset used for model development.
