@@ -93,7 +93,7 @@ model = xgb.XGBRegressor(
     random_state=42
 )
 
-print("\nTraining XGBoost...")
+print("\nTraining XGBoost model in progress.")
 
 model.fit(
     X_train,

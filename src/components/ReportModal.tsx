@@ -34,6 +34,7 @@ import {
 import { RecreatedLogo } from "./RecreatedLogo";
 import { validateCaseId, generateCaseIntegrityHash } from "../utils/validation";
 import { printForensicCaseReport, downloadForensicHtmlReport } from "../utils/printReport";
+import { ForensicPmiReportGraphic } from "./ForensicPmiReportGraphic";
 import {
   downloadSvgAsPng,
   generateHenssgeCoolingSvg,
@@ -287,15 +288,15 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-sm sm:text-base font-bold text-slate-100 truncate">
+                  <h2 className="text-sm sm:text-base font-bold text-slate-100 break-words">
                     Standardized Case Report
                   </h2>
                   <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-teal-950 text-teal-300 border border-teal-800 shrink-0">
                     by Protocol One
                   </span>
                 </div>
-                <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
-                  <span className="truncate">Case #{caseData.caseId || "Unassigned"}</span>
+                <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400 flex-wrap">
+                  <span className="break-words">Case #{caseData.caseId || "Unassigned"}</span>
                   <span className="text-[10px] font-bold text-[#D4AF37] tracking-wider uppercase shrink-0">
                     • Research Prototype
                   </span>
@@ -326,7 +327,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
               <button
                 type="button"
                 onClick={async () => {
-                  setDownloadSuccess("Downloading Henssge Curve PNG...");
+                  setDownloadSuccess("Downloading Henssge Curve PNG chart.");
                   const svg = generateHenssgeCoolingSvg(result, caseData);
                   await downloadSvgAsPng(svg, `Henssge-CoolingCurve-${caseData.caseId || "CASE"}.png`);
                   setTimeout(() => setDownloadSuccess(null), 3000);
@@ -341,7 +342,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
               <button
                 type="button"
                 onClick={async () => {
-                  setDownloadSuccess("Downloading PMI Distribution PNG...");
+                  setDownloadSuccess("Downloading PMI Distribution PNG chart.");
                   const svg = generatePmiDistributionSvg(result, caseData);
                   await downloadSvgAsPng(svg, `PMI-ProbabilityDensity-${caseData.caseId || "CASE"}.png`);
                   setTimeout(() => setDownloadSuccess(null), 3000);
@@ -356,7 +357,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
               <button
                 type="button"
                 onClick={async () => {
-                  setDownloadSuccess("Downloading Factor Attribution PNG...");
+                  setDownloadSuccess("Downloading Factor Attribution PNG chart.");
                   const svg = generateFactorAttributionSvg(result, null, caseData);
                   await downloadSvgAsPng(svg, `FactorAttribution-SHAP-${caseData.caseId || "CASE"}.png`);
                   setTimeout(() => setDownloadSuccess(null), 3000);
@@ -453,7 +454,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
               </div>
               <div>Generated: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
               <div>Examiner: {caseData.investigatorName || caseData.examinerName || "Staff Medical Examiner"}</div>
-              <div className="text-[10px] font-mono text-slate-500 break-all">Hash: {integrityHash.slice(0, 24)}...</div>
+              <div className="text-[10px] font-mono text-slate-500 break-all">Hash: {integrityHash}</div>
             </div>
           </div>
 
@@ -497,52 +498,37 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 bg-slate-950/60 p-3 sm:p-4 rounded-xl border border-slate-800 text-xs">
             <div className="p-1">
               <div className="text-slate-500 text-[10px] uppercase font-bold">Subject ID</div>
-              <div className="font-semibold text-slate-200 mt-0.5 truncate">{caseData.subjectNameOrIdentifier || "Unidentified"}</div>
+              <div className="font-semibold text-slate-200 mt-0.5 break-words">{caseData.subjectNameOrIdentifier || "Unidentified"}</div>
             </div>
             <div className="p-1">
               <div className="text-slate-500 text-[10px] uppercase font-bold">Age / Sex</div>
-              <div className="font-semibold text-slate-200 mt-0.5 truncate">
+              <div className="font-semibold text-slate-200 mt-0.5 break-words">
                 {caseData.ageYears ? `${caseData.ageYears} yrs` : "Unknown"} / {caseData.sex}
               </div>
             </div>
             <div className="p-1">
               <div className="text-slate-500 text-[10px] uppercase font-bold">Discovery Time</div>
-              <div className="font-semibold text-slate-200 mt-0.5 truncate">{caseData.discoveryTimestamp || "Unrecorded"}</div>
+              <div className="font-semibold text-slate-200 mt-0.5 break-words">{caseData.discoveryTimestamp || "Unrecorded"}</div>
             </div>
             <div className="p-1">
               <div className="text-slate-500 text-[10px] uppercase font-bold">Scene Position</div>
-              <div className="font-semibold text-slate-200 uppercase mt-0.5 truncate">{caseData.bodyFoundPosition}</div>
+              <div className="font-semibold text-slate-200 uppercase mt-0.5 break-words">{caseData.bodyFoundPosition}</div>
             </div>
           </div>
 
           {/* Primary Conclusion Box */}
-          <div className="p-4 sm:p-5 rounded-xl sm:rounded-2xl bg-gradient-to-br from-teal-950/60 via-slate-950 to-slate-950 border border-teal-800/80 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <span className="text-xs font-bold text-teal-300 uppercase tracking-wider">
-                Consensus Post-Mortem Interval & Time of Death
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-700 text-xs font-mono font-bold w-fit">
-                {result.confidenceScore}% Confidence ({result.confidenceTier})
-              </span>
-            </div>
+          <div className="space-y-3">
+            <ForensicPmiReportGraphic result={result} caseData={caseData} />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div className="p-3.5 sm:p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="text-xs text-slate-400 font-medium">Estimated PMI Window:</div>
-                <div className="text-xl sm:text-2xl font-bold font-mono text-teal-300 mt-1">
-                  {result.estimatedPmiMinHours} – {result.estimatedPmiMaxHours} <span className="text-xs font-normal text-slate-400">Hours</span>
-                </div>
-                <div className="text-xs text-slate-400 mt-1">
-                  Point Optimum: <strong className="text-slate-200">{result.estimatedPmiOptimalHours} hrs</strong> (~{(result.estimatedPmiOptimalHours / 24).toFixed(1)} days)
+            <div className="p-3.5 sm:p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="space-y-0.5">
+                <span className="text-slate-400 font-medium">Estimated Time of Death (Calendar Window):</span>
+                <div className="text-sm sm:text-base font-bold font-mono text-emerald-300">
+                  {result.estimatedTimeOfDeathMin} <span className="text-xs font-normal text-slate-400">to</span> {result.estimatedTimeOfDeathMax}
                 </div>
               </div>
-
-              <div className="p-3.5 sm:p-4 rounded-xl bg-slate-900/80 border border-slate-800">
-                <div className="text-xs text-slate-400 font-medium">Estimated Time of Death (TOD):</div>
-                <div className="text-sm sm:text-base font-bold font-mono text-emerald-300 mt-1 truncate">
-                  {result.estimatedTimeOfDeathMin}
-                </div>
-                <div className="text-xs text-slate-400 truncate">to {result.estimatedTimeOfDeathMax}</div>
+              <div className="text-[11px] text-slate-400">
+                Optimum Time: <strong className="text-teal-300 font-mono">{result.estimatedTimeOfDeathOptimal || result.estimatedTimeOfDeathMin}</strong>
               </div>
             </div>
           </div>
@@ -722,7 +708,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
                   <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-0.5">
                     <div className="text-[10px] text-slate-400 uppercase font-mono">Decomposition / Decay</div>
-                    <div className="font-semibold text-amber-300 capitalize truncate">
+                    <div className="font-semibold text-amber-300 capitalize break-words">
                       {visionData?.detectedDecompositionStage?.replace(/_/g, " ") || "Indeterminate"}
                       {visionData?.estimatedTbs && (
                         <span className="text-slate-400 font-mono font-normal ml-1">
@@ -734,7 +720,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
 
                   <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-0.5">
                     <div className="text-[10px] text-slate-400 uppercase font-mono">Skin Color & Hypostasis</div>
-                    <div className="font-semibold text-purple-300 capitalize truncate">
+                    <div className="font-semibold text-purple-300 capitalize break-words">
                       {visionData?.detectedLivor?.colorClassification?.replace(/_/g, " ") || "Violaceous"}
                       <span className="text-slate-400 font-mono font-normal ml-1">
                         ({visionData?.detectedLivor?.estimatedFixation?.replace(/_/g, " ") || "Partially Fixed"})
@@ -744,7 +730,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
 
                   <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-0.5">
                     <div className="text-[10px] text-slate-400 uppercase font-mono">Entomology / Insects</div>
-                    <div className="font-semibold text-emerald-300 capitalize truncate">
+                    <div className="font-semibold text-emerald-300 capitalize break-words">
                       {visionData?.detectedEntomology?.primaryInsectStage?.replace(/_/g, " ") || "None Visible"}
                     </div>
                   </div>
@@ -860,13 +846,13 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                   Digital Chain of Custody & Examiner Sign-Off
                 </span>
               </div>
-              <span className="text-[10px] font-mono text-slate-400">Record Hash: {integrityHash.slice(0, 16)}...</span>
+              <span className="text-[10px] font-mono text-slate-400 break-all">Record Hash: {integrityHash}</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 pt-1 sm:pt-2 text-xs">
               <div className="space-y-1 sm:space-y-2">
                 <span className="text-slate-500 font-medium">Attending Pathologist:</span>
-                <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 font-semibold truncate">
+                <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-200 font-semibold break-words">
                   {caseData.investigatorName || "Staff Medical Examiner"}
                 </div>
               </div>
@@ -902,7 +888,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
               Generated by <strong>VisionMortis</strong> • Designed and Engineered by <strong>Protocol One</strong>
             </div>
             <div className="text-[10px] text-[#D4AF37] font-semibold break-all">
-              Research Prototype • Decision Support Only • Hash: {integrityHash.slice(0, 24)}...
+              Research Prototype • Decision Support Only • Hash: {integrityHash}
             </div>
           </div>
         </div>

@@ -44,6 +44,7 @@ import { auditPresetModifications } from "../utils/presetAudit";
 import { printForensicCaseReport, downloadForensicHtmlReport } from "../utils/printReport";
 import { runInBrowserXgbPrediction } from "../utils/inBrowserXgbModel";
 import { PmiOutputPanel } from "./PmiOutputPanel";
+import { ForensicPmiReportGraphic } from "./ForensicPmiReportGraphic";
 import {
   downloadSvgAsPng,
   generateHenssgeCoolingSvg,
@@ -352,14 +353,14 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-base sm:text-xl font-bold text-slate-100 tracking-tight truncate">
+              <h2 className="text-base sm:text-xl font-bold text-slate-100 tracking-tight break-words">
                 Forensic Case Report
               </h2>
               <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-800 shrink-0">
                 Official Report
               </span>
             </div>
-            <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 line-clamp-2 sm:line-clamp-none">
+            <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 break-words leading-relaxed">
               Comprehensive multimodal estimation report including all case inputs, scene parameters, and photographic evidence.
             </p>
           </div>
@@ -372,7 +373,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
             <button
               type="button"
               onClick={async () => {
-                setDownloadSuccess("Downloading Henssge Cooling Curve PNG...");
+                setDownloadSuccess("Downloading Henssge Cooling Curve PNG chart.");
                 const svg = generateHenssgeCoolingSvg(result, caseData);
                 await downloadSvgAsPng(svg, `Henssge-CoolingCurve-${caseData.caseId || "CASE"}.png`);
                 setTimeout(() => setDownloadSuccess(null), 3000);
@@ -387,7 +388,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
             <button
               type="button"
               onClick={async () => {
-                setDownloadSuccess("Downloading PMI Probability Density PNG...");
+                setDownloadSuccess("Downloading PMI Probability Density PNG chart.");
                 const svg = generatePmiDistributionSvg(result, caseData);
                 await downloadSvgAsPng(svg, `PMI-ProbabilityDensity-${caseData.caseId || "CASE"}.png`);
                 setTimeout(() => setDownloadSuccess(null), 3000);
@@ -402,7 +403,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
             <button
               type="button"
               onClick={async () => {
-                setDownloadSuccess("Downloading Factor Attribution & SHAP PNG...");
+                setDownloadSuccess("Downloading Factor Attribution and SHAP PNG chart.");
                 const svg = generateFactorAttributionSvg(result, mlPredictionData, caseData);
                 await downloadSvgAsPng(svg, `FactorAttribution-TreeSHAP-${caseData.caseId || "CASE"}.png`);
                 setTimeout(() => setDownloadSuccess(null), 3000);
@@ -417,7 +418,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
             <button
               type="button"
               onClick={async () => {
-                setDownloadSuccess("Generating Complete Visual & Data Bundle...");
+                setDownloadSuccess("Generating Complete Visual and Data Bundle.");
                 await downloadAllVisualizationsBundle(result, mlPredictionData, caseData);
                 setTimeout(() => setDownloadSuccess(null), 3500);
               }}
@@ -523,7 +524,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                 {isAiLoading ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Synthesizing AI...</span>
+                    <span>Synthesizing AI in progress</span>
                   </>
                 ) : (
                   <>
@@ -561,7 +562,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
           </div>
           <div className="p-2 rounded-lg bg-slate-950/70 border border-slate-800 flex items-center justify-between">
             <span className="text-slate-400">AI Pathologist:</span>
-            <span className="font-mono text-teal-300 font-semibold">{isAiLoading ? "Synthesizing..." : result.aiSynthesis ? "Synchronized" : "Ready"}</span>
+            <span className="font-mono text-teal-300 font-semibold">{isAiLoading ? "Synthesizing" : result.aiSynthesis ? "Synchronized" : "Ready"}</span>
           </div>
         </div>
       </div>
@@ -712,72 +713,84 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
             <span>1. Case Demographics & Scene Baseline</span>
           </div>
 
-          <div className={`grid grid-cols-1 sm:grid-cols-2 ${(presetAudit.isPreset || presetAudit.isSceneBaseline) ? 'lg:grid-cols-6' : 'lg:grid-cols-5'} gap-3`}>
-            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800">
-              <div className="text-[11px] text-slate-500">Case / File Number</div>
-              <div className="font-mono font-bold text-sm text-slate-100 mt-0.5 truncate">
-                {caseData.caseId || "Not Assigned"}
+          <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6 gap-3.5`}>
+            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div className="text-[11px] text-slate-500 font-medium">Case / File Number</div>
+                <div className="font-mono font-bold text-sm text-slate-100 mt-1 break-words">
+                  {caseData.caseId || "Not Assigned"}
+                </div>
               </div>
             </div>
 
             {(presetAudit.isPreset || presetAudit.isSceneBaseline) && (
-              <div className={`p-3.5 rounded-xl border ${
+              <div className={`p-3.5 rounded-xl border flex flex-col justify-between ${
                 presetAudit.isModified
                   ? "bg-amber-950/20 border-amber-800/60"
                   : "bg-slate-900/90 border-slate-800"
               }`}>
-                <div className="text-[11px] text-slate-500">{presetAudit.isSceneBaseline ? "Scene Baseline Status" : "Preset Case Status"}</div>
-                <div className="font-bold text-xs mt-0.5 truncate text-slate-200" title={presetAudit.presetName}>
-                  {presetAudit.presetName || (presetAudit.isSceneBaseline ? "Initial Scene Intake" : "Benchmark Case")}
+                <div>
+                  <div className="text-[11px] text-slate-500 font-medium">{presetAudit.isSceneBaseline ? "Scene Baseline Status" : "Preset Case Status"}</div>
+                  <div className="font-bold text-xs mt-1 text-slate-200 break-words leading-snug" title={presetAudit.presetName}>
+                    {presetAudit.presetName || (presetAudit.isSceneBaseline ? "Initial Scene Intake" : "Benchmark Case")}
+                  </div>
                 </div>
-                <div className={`text-[10px] font-semibold mt-1 truncate ${
+                <div className={`text-[10px] font-semibold mt-2 break-words leading-tight ${
                   presetAudit.isModified ? "text-amber-400 font-medium" : "text-emerald-400"
                 }`}>
-                  {presetAudit.isModified ? `⚠️ Modified (${presetAudit.modifiedCount} Δ)` : "✓ Unaltered Baseline"}
+                  {presetAudit.isModified ? `⚠️ Modified (${presetAudit.modifiedCount} parameter${presetAudit.modifiedCount !== 1 ? "s" : ""})` : "✓ Unaltered Baseline (Standard Reference)"}
                 </div>
               </div>
             )}
 
-            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-teal-900/40 bg-gradient-to-b from-slate-900 to-teal-950/20">
-              <div className="text-[11px] text-teal-400 font-medium">Attending Pathologist / Examiner</div>
-              <div className="font-bold text-sm text-teal-200 mt-0.5 truncate" title={caseData.investigatorName || caseData.examinerName || "Staff Medical Examiner"}>
-                {caseData.investigatorName || caseData.examinerName || "Staff Medical Examiner"}
+            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-teal-900/40 bg-gradient-to-b from-slate-900 to-teal-950/20 flex flex-col justify-between">
+              <div>
+                <div className="text-[11px] text-teal-400 font-medium">Attending Pathologist / Examiner</div>
+                <div className="font-bold text-sm text-teal-200 mt-1 break-words leading-snug">
+                  {caseData.investigatorName || caseData.examinerName || "Staff Medical Examiner"}
+                </div>
               </div>
-              <div className="text-[10px] text-slate-400 mt-1 truncate">
+              <div className="text-[10px] text-slate-400 mt-2 break-words leading-tight">
                 {caseData.jurisdiction || "Division of Forensic Medicine"}
               </div>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800">
-              <div className="text-[11px] text-slate-500">Subject Identification</div>
-              <div className="font-bold text-sm text-slate-100 mt-0.5 truncate">
-                {caseData.subjectNameOrIdentifier || "Unidentified Doe"}
+            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div className="text-[11px] text-slate-500 font-medium">Subject Identification</div>
+                <div className="font-bold text-sm text-slate-100 mt-1 break-words leading-snug">
+                  {caseData.subjectNameOrIdentifier || "Unidentified Doe"}
+                </div>
               </div>
-              <div className="text-[10px] text-slate-400 mt-1 capitalize">
+              <div className="text-[10px] text-slate-400 mt-2 capitalize break-words">
                 {caseData.ageYears ? `${caseData.ageYears} yrs` : "Age Unspecified"} • {caseData.sex}
               </div>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800">
-              <div className="text-[11px] text-slate-500">Discovery Timestamp</div>
-              <div className="font-mono text-xs font-semibold text-slate-200 mt-0.5">
-                {caseData.discoveryTimestamp ? (() => {
-                  const s = caseData.discoveryTimestamp.trim();
-                  const d = new Date(s.includes(" ") && !s.includes("T") ? s.replace(" ", "T") : s);
-                  return isNaN(d.getTime()) ? caseData.discoveryTimestamp : d.toLocaleString();
-                })() : "Not Recorded"}
+            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div className="text-[11px] text-slate-500 font-medium">Discovery Timestamp</div>
+                <div className="font-mono text-xs font-semibold text-slate-200 mt-1 break-words">
+                  {caseData.discoveryTimestamp ? (() => {
+                    const s = caseData.discoveryTimestamp.trim();
+                    const d = new Date(s.includes(" ") && !s.includes("T") ? s.replace(" ", "T") : s);
+                    return isNaN(d.getTime()) ? caseData.discoveryTimestamp : d.toLocaleString();
+                  })() : "Not Recorded"}
+                </div>
               </div>
-              <div className="text-[10px] text-slate-400 mt-1 truncate">
+              <div className="text-[10px] text-slate-400 mt-2 break-words leading-tight">
                 Location: {caseData.locationDescription || "Scene"}
               </div>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800">
-              <div className="text-[11px] text-slate-500">Scene Environmental Parameters</div>
-              <div className="font-mono text-xs font-bold text-teal-400 mt-0.5">
-                Ambient: {caseData.ambientTempC}°C • Mass: {caseData.bodyWeightKg}kg
+            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div className="text-[11px] text-slate-500 font-medium">Scene Environmental Parameters</div>
+                <div className="font-mono text-xs font-bold text-teal-400 mt-1 break-words leading-snug">
+                  Ambient: {caseData.ambientTempC}°C • Mass: {caseData.bodyWeightKg}kg
+                </div>
               </div>
-              <div className="text-[10px] text-slate-400 mt-1 capitalize">
+              <div className="text-[10px] text-slate-400 mt-2 capitalize break-words">
                 Posture: {caseData.bodyFoundPosition}
               </div>
             </div>
@@ -799,44 +812,37 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800">
-              <div className="text-xs text-slate-400 font-medium">Estimated PMI Window</div>
-              <div className="text-2xl font-black text-slate-100 font-mono mt-1">
-                {result.estimatedPmiMinHours} – {result.estimatedPmiMaxHours}{" "}
-                <span className="text-sm font-normal text-slate-400">Hours</span>
-              </div>
-              <div className="text-xs text-slate-400 mt-1">
-                ~{(result.estimatedPmiMinHours / 24).toFixed(1)} to {(result.estimatedPmiMaxHours / 24).toFixed(1)} post-mortem days
-              </div>
-            </div>
+          {/* Forensic Graphic: Estimated PMI Range, Continuum Timeline, & Metric Gauges */}
+          <ForensicPmiReportGraphic result={result} caseData={caseData} />
 
-            <div className="p-4 rounded-xl bg-teal-950/50 border border-teal-500/40">
-              <div className="text-xs text-teal-300 font-medium">Point Optimum PMI</div>
-              <div className="text-2xl font-black text-teal-300 font-mono mt-1">
-                {result.estimatedPmiOptimalHours}{" "}
-                <span className="text-sm font-normal text-teal-400/80">Hours</span>
-              </div>
-              <div className="text-xs text-teal-400/80 mt-1">
-                ~{(result.estimatedPmiOptimalHours / 24).toFixed(1)} days post-mortem
-              </div>
-            </div>
-
+          {/* Time of Death & Dominant Estimator Demarcation */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800">
-              <div className="text-xs text-slate-400 font-medium">Estimated Time of Death</div>
-              <div className="text-sm font-bold text-slate-100 font-mono mt-1">
+              <div className="text-xs text-slate-400 font-medium">Estimated Time of Death Window (Calendar)</div>
+              <div className="text-sm sm:text-base font-bold text-slate-100 font-mono mt-1 break-words">
                 {result.estimatedTimeOfDeathMin}
               </div>
-              <div className="text-xs text-slate-400">to {result.estimatedTimeOfDeathMax}</div>
+              <div className="text-xs text-slate-400 mt-0.5 break-words">to {result.estimatedTimeOfDeathMax}</div>
+              <div className="text-[11px] text-slate-500 mt-2 border-t border-slate-800 pt-1.5">
+                Optimum TOD: <span className="text-teal-300 font-mono font-semibold">{result.estimatedTimeOfDeathOptimal || result.estimatedTimeOfDeathMin}</span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <div className="text-xs text-slate-400 font-medium">Dominant Multimodal Estimators</div>
+                <div className="text-xs text-teal-300 font-semibold mt-1.5 leading-relaxed">
+                  {result.dominantIndicatorSummary?.length > 0
+                    ? result.dominantIndicatorSummary.join(" • ")
+                    : "Multimodal Bayesian Equilibrium"}
+                </div>
+              </div>
+              <div className="text-[11px] text-slate-500 mt-2 border-t border-slate-800 pt-1.5 flex items-center justify-between">
+                <span>Active Diagnostic Indicators:</span>
+                <span className="font-mono text-slate-300 font-semibold">{result.indicatorEvaluations?.length || 6} Modalities</span>
+              </div>
             </div>
           </div>
-
-          {result.dominantIndicatorSummary?.length > 0 && (
-            <div className="text-xs text-slate-400 pt-1 flex items-center gap-2">
-              <span className="font-semibold text-slate-300">Dominant Estimators:</span>
-              <span className="text-teal-400">{result.dominantIndicatorSummary.join(" • ")}</span>
-            </div>
-          )}
 
           {/* XGBoost 100-Tree Model & TreeSHAP Section Callout */}
           <div className="mt-3 p-4 rounded-xl bg-slate-950/90 border border-emerald-800/60 space-y-3">
@@ -894,11 +900,11 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                   {mlPredictionData.factorAttributions.slice(0, 4).map((attr, idx) => (
                     <div
                       key={idx}
-                      className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/80 flex items-center justify-between gap-2 text-[11px]"
+                      className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/80 flex items-start justify-between gap-2 text-[11px]"
                     >
-                      <div className="truncate">
-                        <span className="font-medium text-slate-200 truncate">{attr.factorName}</span>
-                        <div className="text-[10px] text-slate-400 truncate">{attr.explanation}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-slate-200 break-words">{attr.factorName}</div>
+                        <div className="text-[10px] text-slate-400 leading-snug break-words mt-0.5">{attr.explanation}</div>
                       </div>
                       <span
                         className={`px-1.5 py-0.5 rounded font-mono font-bold text-[10px] shrink-0 ${
@@ -1103,7 +1109,7 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
                 <div className="space-y-1 text-slate-400 font-mono text-[11px]">
                   <div>Active Analytes: <span className="text-slate-200 font-bold">{caseData.metabolomics.selectedMetabolites?.length || 0} of 11 Panel Markers</span></div>
                   {caseData.metabolomics.selectedMetabolites && caseData.metabolomics.selectedMetabolites.length > 0 && (
-                    <div className="line-clamp-2">Markers: <span className="text-slate-300">{caseData.metabolomics.selectedMetabolites.map(m => `${m.name} (${m.measuredValue} ${m.unit})`).join(", ")}</span></div>
+                    <div className="break-words leading-relaxed">Markers: <span className="text-slate-300">{caseData.metabolomics.selectedMetabolites.map(m => `${m.name} (${m.measuredValue} ${m.unit})`).join(", ")}</span></div>
                   )}
                 </div>
               ) : (
@@ -1305,8 +1311,8 @@ Generated: ${new Date().toISOString()} • VisionMortis by Protocol One
           </div>
           <div>
             <div className="text-[11px] text-slate-500 mb-6">Signature & Verification</div>
-            <div className="border-b border-slate-700 pb-1 font-mono text-[11px] text-slate-300">
-              Checksum: {integrityHash.slice(0, 16)}...
+            <div className="border-b border-slate-700 pb-1 font-mono text-[11px] text-slate-300 break-all">
+              Checksum: {integrityHash}
             </div>
           </div>
           <div>

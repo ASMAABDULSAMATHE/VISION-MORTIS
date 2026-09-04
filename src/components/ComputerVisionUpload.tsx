@@ -1887,7 +1887,7 @@ export const ComputerVisionUpload: React.FC<Props> = ({
                   {analyzing && (
                     <span className="flex items-center gap-1.5 text-xs text-teal-400 animate-pulse font-medium">
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      Analyzing photos...
+                      Analyzing photos in progress.
                     </span>
                   )}
                 </div>

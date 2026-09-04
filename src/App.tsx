@@ -604,7 +604,7 @@ export default function App() {
                     Research Prototype
                   </span>
                 </div>
-                <div className="text-[11px] text-slate-400 font-medium leading-tight mt-0.5 truncate">
+                <div className="text-[11px] text-slate-400 font-medium leading-tight mt-0.5 break-words">
                   Forensic Post-Mortem Interval Estimation
                 </div>
               </div>
@@ -740,12 +740,12 @@ export default function App() {
                 <span className="text-[10px] uppercase font-bold text-slate-500">Active Case</span>
                 <span className="font-mono text-teal-400 font-bold">{caseData.caseId || "None"}</span>
               </div>
-              <div className="font-semibold text-slate-200 truncate">
+              <div className="font-semibold text-slate-200 break-words">
                 {caseData.presetName || caseData.subjectNameOrIdentifier || "Unassigned Subject"}
               </div>
-              <div className="text-xs text-slate-400 flex items-center gap-1.5">
+              <div className="text-xs text-slate-400 flex items-center gap-1.5 flex-wrap">
                 <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                <span className="truncate">{caseData.discoveryTimestamp || "No timestamp"}</span>
+                <span className="break-words">{caseData.discoveryTimestamp || "No timestamp"}</span>
               </div>
 
               {/* Sidebar Quick Case Preset Switcher */}
@@ -809,12 +809,12 @@ export default function App() {
 
                       {/* Custom Non-Preset Status indicator in sidebar */}
                       {!presetAudit.isPreset && !presetAudit.isSceneBaseline && (
-                        <div className="mt-1 text-[10px] text-slate-400 font-medium truncate flex items-center justify-between gap-1.5">
-                          <span className="flex items-center gap-1.5 truncate">
+                        <div className="mt-1 text-[10px] text-slate-400 font-medium flex items-center justify-between gap-1.5 flex-wrap">
+                          <span className="flex items-center gap-1.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0"></span>
-                            <span className="truncate">Custom Investigator Casework</span>
+                            <span className="break-words">Custom Investigator Casework</span>
                           </span>
-                          <span className="text-[9px] text-teal-400/80 font-mono">Clean State</span>
+                          <span className="text-[9px] text-teal-400/80 font-mono shrink-0">Clean State</span>
                         </div>
                       )}
 
@@ -854,9 +854,9 @@ export default function App() {
                               </div>
                             </div>
                           ) : (
-                            <div className="text-[10px] text-emerald-400 font-medium truncate flex items-center gap-1">
+                            <div className="text-[10px] text-emerald-400 font-medium flex items-center gap-1 break-words">
                               <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
-                              <span className="truncate">Original: {FORENSIC_PRESETS[activePresetIdx]?.presetCategory || "Benchmark"}</span>
+                              <span className="break-words">Original: {FORENSIC_PRESETS[activePresetIdx]?.presetCategory || "Benchmark"}</span>
                             </div>
                           )}
                         </div>
@@ -907,17 +907,17 @@ export default function App() {
                         : "hover:bg-slate-800/60 text-slate-400 hover:text-slate-200 border border-transparent"
                     }`}
                   >
-                    <div className="flex items-center gap-2.5 truncate">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 text-left">
                       <Icon
                         className={`w-4 h-4 shrink-0 ${
                           isCurrent ? "text-teal-400" : "text-slate-500"
                         }`}
                       />
-                      <span className="truncate font-medium">{step.label}</span>
+                      <span className="font-medium break-words leading-tight">{step.label}</span>
                     </div>
 
                     <span
-                      className={`text-[10px] font-mono px-2 py-0.5 rounded truncate max-w-[90px] ${
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded shrink-0 whitespace-nowrap ml-1 ${
                         isCurrent
                           ? "bg-teal-900/60 text-teal-300"
                           : "bg-slate-950 text-slate-500"
@@ -1176,14 +1176,14 @@ export default function App() {
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-sm sm:text-base font-semibold text-slate-100 flex items-center gap-2">
-                    <span className="truncate">1. Case Identification & Scene Baseline</span>
+                    <span className="break-words">1. Case Identification & Scene Baseline</span>
                     {metadataCollapsed ? (
                       <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
                     ) : (
                       <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" />
                     )}
                   </h3>
-                  <p className="text-[11px] sm:text-xs text-slate-400 truncate sm:whitespace-normal">
+                  <p className="text-[11px] sm:text-xs text-slate-400 break-words">
                     Core parameters governing cooling and decay formulas
                   </p>
                 </div>
