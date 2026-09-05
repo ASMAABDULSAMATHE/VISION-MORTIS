@@ -1088,8 +1088,15 @@ async function startServer() {
   });
 }
 
-// Only launch standalone HTTP server when not running in a serverless environment (e.g. Vercel)
-if (!process.env.VERCEL) {
+// Only launch standalone HTTP server when executed directly as main script and not in a serverless environment
+const isMainScript = Boolean(
+  process.argv[1] &&
+  (process.argv[1].endsWith("server.ts") ||
+   process.argv[1].endsWith("server.cjs") ||
+   process.argv[1].endsWith("server.js"))
+);
+
+if (isMainScript && !process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
   startServer();
 }
 
