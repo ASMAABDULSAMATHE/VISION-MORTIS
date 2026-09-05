@@ -1088,4 +1088,9 @@ async function startServer() {
   });
 }
 
-startServer();
+// Only launch standalone HTTP server when not running in a serverless environment (e.g. Vercel)
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
