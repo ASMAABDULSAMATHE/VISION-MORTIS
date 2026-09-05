@@ -1,14 +1,20 @@
 import express from "express";
 import path from "path";
 import dotenv from "dotenv";
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: "50mb" }));
+// Body parser with serverless runtime compatibility
+app.use((req, res, next) => {
+  if (req.body && typeof req.body === "object" && Object.keys(req.body).length > 0) {
+    return next();
+  }
+  return express.json({ limit: "50mb" })(req, res, next);
+});
 
 // Server-side Gemini AI initialization
 function getGeminiClient(): GoogleGenAI | null {
@@ -24,20 +30,20 @@ function getGeminiClient(): GoogleGenAI | null {
   });
 }
 
-// Fallback model list: gemini-3.6-flash is recommended to replace deprecated models,
-// gemini-3.1-flash-lite offers high-availability low-latency fallback, followed by gemini-3.7-flash and gemini-flash-latest
+// Fallback model list: prioritize gemini-3.8-flash per guidelines, followed by gemini-flash-latest,
+// gemini-3.1-flash-lite for high-availability low-latency, and gemini-3.6-flash
 const GEMINI_MODELS = [
-  "gemini-3.6-flash",
-  "gemini-3.1-flash-lite",
-  "gemini-3.7-flash",
+  "gemini-3.8-flash",
   "gemini-flash-latest",
+  "gemini-3.1-flash-lite",
+  "gemini-3.6-flash",
 ];
 
 async function callGeminiWithFallback(
   ai: GoogleGenAI,
   contents: any,
   systemInstruction?: string,
-  timeoutMs = 60000
+  timeoutMs = 45000
 ): Promise<string> {
   let lastError: any = null;
 
@@ -50,9 +56,6 @@ async function callGeminiWithFallback(
           responseMimeType: "application/json",
           temperature: 0.1,
           systemInstruction,
-          thinkingConfig: model.startsWith("gemini-3")
-            ? { thinkingLevel: ThinkingLevel.LOW }
-            : undefined,
         },
       });
 
@@ -77,7 +80,7 @@ async function callGeminiWithFallback(
         err?.status === "RESOURCE_EXHAUSTED" ||
         err?.code === 429;
 
-      console.warn(`[Gemini API] Model ${model} returned error (retryable: ${isRetryable}): ${err?.message || err}`);
+      console.warn(`[Gemini API] Model ${model} returned error (switching to next fallback model, retryable: ${isRetryable}): ${err?.message || err}`);
     }
   }
 

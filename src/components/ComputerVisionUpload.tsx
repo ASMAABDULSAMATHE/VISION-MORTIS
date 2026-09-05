@@ -87,10 +87,47 @@ const isForensicSafelist = (text: string) => {
     t.includes("rigor") ||
     t.includes("algor") ||
     t.includes("autopsy") ||
-    t.includes("body") ||
+    t.includes("autopsy") ||
+    t.includes("corpse") ||
+    t.includes("cadaver") ||
     t.includes("post_mortem") ||
     t.includes("postmortem")
   );
+};
+
+// Resizes and optimizes images to ensure rapid API processing and avoid Vercel 4.5MB payload limit
+const downscaleImageForApi = (dataUrl: string, maxDim = 1200, quality = 0.82): Promise<string> => {
+  return new Promise((resolve) => {
+    if (!dataUrl || !dataUrl.startsWith("data:image")) return resolve(dataUrl);
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      let { width, height } = img;
+      if (width <= maxDim && height <= maxDim && dataUrl.length < 350000) {
+        return resolve(dataUrl);
+      }
+      if (width > height) {
+        if (width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        }
+      } else {
+        if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return resolve(dataUrl);
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
 };
 
 // Real client-side canvas pixel & visual structure classifier
@@ -271,8 +308,7 @@ const analyzeImagePixelMetrics = (
 
         // --- Multi-Feature Classification Logic ---
         const lowerName = (fileName || "").toLowerCase();
-        const lowerTag = (tagHint || "").toLowerCase();
-        const isSafeForensic = isForensicSafelist(lowerName) || isForensicSafelist(lowerTag);
+        const isSafeForensic = isForensicSafelist(lowerName);
 
         // Document / ID Card heuristics:
         const hasDocFilename =
@@ -280,8 +316,8 @@ const analyzeImagePixelMetrics = (
           /(id_card|emirates_id|identity_card|passport_copy|doc_scan|notes_photo|receipt_img)/i.test(lowerName);
 
         const hasLiveFilename =
-          /\b(selfie|living|person|alive|portrait|boy|girl|man|woman|child|family|profile|me|vacation|party|self_portrait|smile|friend)\b/i.test(lowerName) ||
-          /(selfie_photo|living_person|family_pic|profile_picture)/i.test(lowerName);
+          /\b(selfie|living|person|alive|portrait|boy|girl|man|woman|child|family|profile|me|vacation|party|self_portrait|smile|friend|human)\b/i.test(lowerName) ||
+          /(selfie_photo|living_person|family_pic|profile_picture|human_photo)/i.test(lowerName);
 
         const hasObjectFilename =
           /\b(dog|cat|pet|puppy|kitten|coffee|cup|mug|food|meal|pizza|burger|car|vehicle|traffic|meme|funny|nature|tree|building|desk|chair|room|interior|flower)\b/i.test(lowerName);
@@ -303,21 +339,21 @@ const analyzeImagePixelMetrics = (
           (paperRatio > 0.65 && skinRatio < 0.10) ||
           (hasDocFilename && !isSafeForensic);
 
-        // Visual living human detector: high warm skin ratio + high vitality + absence of hypostasis & decomp
+        // Visual living human detector: healthy skin tones present with complete absence of cadaveric lividity & decomposition
+        const hasZeroDecompMarkers = livorRatio < 0.025 && greenRatio < 0.025;
         const isVisualLivingPerson =
-          (!isVisualDocument &&
-            skinRatio > 0.18 &&
-            livorRatio < 0.02 &&
-            greenRatio < 0.02 &&
-            (hasLiveFilename || (!isSafeForensic && skinRatio > 0.28))) ||
-          (hasLiveFilename && !isSafeForensic);
+          !isVisualDocument &&
+          (hasLiveFilename ||
+            (hasZeroDecompMarkers && skinRatio > 0.06 && darkRatio < 0.70) ||
+            (hasZeroDecompMarkers && skinRatio > 0.03 && avgBrightness > 60 && avgBrightness < 215) ||
+            (!isSafeForensic && skinRatio > 0.12 && livorRatio < 0.03));
 
         // Visual unrelated object detector: low skin, low paper, low forensic markers
         const isVisualObject =
           !isVisualDocument &&
           !isVisualLivingPerson &&
           !isSafeForensic &&
-          (hasObjectFilename || (skinRatio < 0.04 && livorRatio < 0.015 && greenRatio < 0.015 && paperRatio < 0.30));
+          (hasObjectFilename || (skinRatio < 0.03 && livorRatio < 0.015 && greenRatio < 0.015 && paperRatio < 0.30));
 
         if (isVisualDocument) {
           detectedCategory = "writing_or_document";
@@ -843,13 +879,18 @@ export const ComputerVisionUpload: React.FC<Props> = ({
     setErrorMsg(null);
 
     try {
-      const payloadImages = imagesToAnalyze.map((img) => ({
-        id: img.id,
-        name: img.name,
-        tag: img.tag || "scene_context",
-        imageBase64: img.dataUrl,
-        mimeType: img.dataUrl.startsWith("data:image/png") ? "image/png" : "image/jpeg",
-      }));
+      const payloadImages = await Promise.all(
+        imagesToAnalyze.map(async (img) => {
+          const optimizedBase64 = await downscaleImageForApi(img.dataUrl, 1200, 0.82);
+          return {
+            id: img.id,
+            name: img.name,
+            tag: img.tag || "scene_context",
+            imageBase64: optimizedBase64,
+            mimeType: optimizedBase64.startsWith("data:image/png") ? "image/png" : "image/jpeg",
+          };
+        })
+      );
 
       const res = await fetch("/api/vision-detect", {
         method: "POST",

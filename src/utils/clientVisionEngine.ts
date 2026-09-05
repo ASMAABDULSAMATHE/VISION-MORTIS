@@ -324,7 +324,7 @@ export async function analyzeImageWithCanvas(
 
       // 4. Living Person Check
       const filenameLivingMatch =
-        /\b(selfie|living|person|alive|portrait|boy|girl|man|woman|child|family|me|vacation|party)\b/i.test(
+        /\b(selfie|living|person|alive|portrait|boy|girl|man|woman|child|family|me|vacation|party|human)\b/i.test(
           lowerName
         );
 
@@ -337,11 +337,17 @@ export async function analyzeImageWithCanvas(
       const isLivingPerson =
         !isDocumentOrText &&
         (filenameLivingMatch ||
-          (livingSkinRatio > 0.35 &&
+          (livingSkinRatio > 0.06 &&
+            livorRatio < 0.025 &&
+            greeningRatio < 0.025 &&
+            meanLuminance > 50 &&
+            meanLuminance < 225) ||
+          (livingSkinRatio > 0.03 &&
+            boneRatio < 0.04 &&
+            maggotRatio < 0.01 &&
             livorRatio < 0.015 &&
-            greeningRatio < 0.01 &&
-            meanLuminance > 60 &&
-            meanLuminance < 200));
+            greeningRatio < 0.015 &&
+            meanLuminance > 55));
 
       const isForensicCorpse = !isDocumentOrText && !isLivingPerson;
 
@@ -353,7 +359,14 @@ export async function analyzeImageWithCanvas(
       let minH = 10;
       let maxH = 24;
 
-      if (boneRatio > 0.32 || lowerName.includes("skeleton") || lowerName.includes("bone")) {
+      if (isLivingPerson || isDocumentOrText) {
+        dominantDecompStage = "fresh";
+        tbsHead = 1;
+        tbsTrunk = 1;
+        tbsLimbs = 1;
+        minH = 0;
+        maxH = 0;
+      } else if (boneRatio > 0.32 || lowerName.includes("skeleton") || lowerName.includes("bone")) {
         dominantDecompStage = "skeletonization";
         tbsHead = 8;
         tbsTrunk = 10;
@@ -376,7 +389,7 @@ export async function analyzeImageWithCanvas(
         greeningRatio > 0.08 ||
         lowerName.includes("bloat") ||
         lowerName.includes("purge") ||
-        tag.includes("abdomen")
+        (tag.includes("abdomen") && greeningRatio > 0.03)
       ) {
         dominantDecompStage = "bloating_purge";
         tbsHead = 5;
