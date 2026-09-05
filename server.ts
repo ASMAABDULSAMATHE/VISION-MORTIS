@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
@@ -100,7 +99,7 @@ function extractJson(rawText: string): any {
 }
 
 // Health check endpoint
-app.get("/api/health", (req, res) => {
+app.get(["/api/health", "/health", "/api"], (req, res) => {
   res.json({
     status: "ok",
     hasApiKey: !!process.env.GEMINI_API_KEY,
@@ -110,7 +109,7 @@ app.get("/api/health", (req, res) => {
 });
 
 // XGBoost + TreeSHAP 208-Feature ML Model Proxy Endpoint
-app.post("/api/ml-predict", async (req, res) => {
+app.post(["/api/ml-predict", "/ml-predict"], async (req, res) => {
   try {
     const { modelUrl, caseData } = req.body;
     const targetUrl = modelUrl || "https://few-parents-return.loca.lt/predict";
@@ -300,12 +299,12 @@ Return ONLY a valid JSON object matching this schema:
   }
 }
 
-// Map both endpoints to ensure full compatibility
-app.post("/api/ai-analyze", handlePathologySynthesis);
-app.post("/api/synthesize-pathology", handlePathologySynthesis);
+// Map endpoints with aliases to ensure full compatibility with and without /api prefix
+app.post(["/api/ai-analyze", "/ai-analyze"], handlePathologySynthesis);
+app.post(["/api/synthesize-pathology", "/synthesize-pathology", "/api/synthesize-report", "/synthesize-report"], handlePathologySynthesis);
 
 // Computer Vision Image Analysis for Forensic Indicators (Supports up to 6 multi-perspective images)
-app.post("/api/vision-detect", async (req, res) => {
+app.post(["/api/vision-detect", "/vision-detect"], async (req, res) => {
   try {
     const ai = getGeminiClient();
     const { images, imageBase64, mimeType = "image/jpeg", notes = "" } = req.body;
@@ -1070,6 +1069,7 @@ Return ONLY a valid JSON object matching this exact schema:
 // Vite middleware setup
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
